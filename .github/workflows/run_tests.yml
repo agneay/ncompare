@@ -28,7 +28,7 @@ jobs:
     name: Python ${{ matrix.python-version }} tests
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Override .python-version for matrix testing
         run: echo "${{ matrix.python-version }}" > .python-version
@@ -66,7 +66,7 @@ jobs:
           uv run coverage report
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: build/reports/coverage${{ matrix.python-version }}.xml
