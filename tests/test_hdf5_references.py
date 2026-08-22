@@ -71,9 +71,7 @@ def test_hdf5_reference_attribute_resolves_against_its_own_file(hdf5_reference_p
     file_b = FileToCompare(path=path_b, type="hdf5")
 
     with Outputter(keep_print_history=True) as out:
-        comparison = Comparison(
-            file_a, file_b, out, show_chunks=False, show_attributes=True
-        )
+        comparison = Comparison(file_a, file_b, out, show_chunks=False, show_attributes=True)
         comparison.run_through_comparisons()
 
     # Because the references point to differently-named targets, correctly resolving
