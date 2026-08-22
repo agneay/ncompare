@@ -1,14 +1,17 @@
 name: Receive PR
 
-# read-only repo token
-# no access to secrets
+# Runs the test suite on pull requests. For same-repo PRs the Earthdata secrets
+# are available, so the integration tests run; PRs from forks have no secrets and
+# skip only the integration step (unit tests still run) -- see run_tests.yml.
 on:
   pull_request:
-    # Sequence of patterns matched against refs/heads
-    branches: [ feature/**, issue/**, issues/** ]
+    # Matched against the base branch (the branch the PR targets).
+    branches: [ develop, main, feature/**, issue/**, issues/** ]
 
 jobs:
   run_tests:
     uses: ./.github/workflows/run_tests.yml
     secrets:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
+      EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}
+      EARTHDATA_PASSWORD: ${{ secrets.EARTHDATA_PASSWORD }}

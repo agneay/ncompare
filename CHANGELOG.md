@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Run the unit and integration test suite on pull requests targeting `develop` and `main` (previously only PRs based on `feature/**`/`issue/**` triggered tests), passing the Earthdata secrets through so integration runs; integration is skipped when credentials are unavailable (e.g., pull requests from forks) ([#355](https://github.com/nasa/ncompare/issues/355)) ([**@danielfromearth**](https://github.com/danielfromearth))
+
 ### Fixed
 
 - Resolve each variable's HDF5 object-reference attributes against its own file (File B was incorrectly dereferenced against File A), and use the correct parent-group name when building nested group paths during traversal ([#341](https://github.com/nasa/ncompare/issues/341)) ([**@danielfromearth**](https://github.com/danielfromearth))

@@ -12,15 +12,20 @@ on:
         required: true
       EARTHDATA_USERNAME:
         description: 'NASA Earthdata username'
-        required: true
+        required: false
       EARTHDATA_PASSWORD:
         description: 'NASA Earthdata password'
-        required: true
+        required: false
   workflow_dispatch:
 
 jobs:
   build_and_test:
     runs-on: ubuntu-latest
+    # Exposed as env so the integration step can be skipped when unavailable
+    # (e.g., pull requests from forks, which have no access to secrets).
+    env:
+      EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}
+      EARTHDATA_PASSWORD: ${{ secrets.EARTHDATA_PASSWORD }}
     strategy:
       matrix:
         python-version: [ '3.11', '3.12', '3.13', '3.14' ]
@@ -54,9 +59,9 @@ jobs:
           uv run pytest -v -m "not integration" --cov=ncompare --cov-report=
 
       - name: Run integration tests with coverage
-        env:
-          EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}
-          EARTHDATA_PASSWORD: ${{ secrets.EARTHDATA_PASSWORD }}
+        # Skipped when Earthdata credentials are unavailable (e.g., fork PRs);
+        # EARTHDATA_USERNAME/PASSWORD come from the job-level env above.
+        if: ${{ env.EARTHDATA_USERNAME != '' }}
         run: |
           uv run pytest -v -m integration --cov=ncompare --cov-append --cov-report=
 
