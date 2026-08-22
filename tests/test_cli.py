@@ -27,6 +27,8 @@ import os
 
 from ncompare.console import _cli
 
+from . import data_for_tests_dir
+
 
 def test_console_version():
     exit_status = os.system("ncompare --version")
@@ -46,3 +48,21 @@ def test_arg_parser():
     assert getattr(parsed, "show_attributes") is False
     assert getattr(parsed, "show_chunks") is False
     assert getattr(parsed, "only_diffs") is False
+    assert getattr(parsed, "exit_code") is False
+
+
+def test_arg_parser_exit_code_flag():
+    assert _cli(["first_netcdf.nc", "second_netcdf.nc"]).exit_code is False
+    assert _cli(["first_netcdf.nc", "second_netcdf.nc", "--exit-code"]).exit_code is True
+
+
+def test_exit_code_reflects_differences():
+    file_a = data_for_tests_dir / "test_a.nc"
+    file_b = data_for_tests_dir / "test_b.nc"
+
+    # Default behavior: always exit 0 on a successful run, even when files differ.
+    assert os.system(f'ncompare "{file_a}" "{file_b}"') == 0
+
+    # With --exit-code: non-zero when differences are found, 0 when there are none.
+    assert os.system(f'ncompare "{file_a}" "{file_b}" --exit-code') != 0
+    assert os.system(f'ncompare "{file_a}" "{file_a}" --exit-code') == 0

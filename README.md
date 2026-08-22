@@ -75,6 +75,13 @@ a common use of _ncompare_ may look like this example:
 ncompare S001G01.nc S001G01_SUBSET.nc --file-text subset_comparison.txt
 ```
 
+To make _ncompare_ return a non-zero exit code when any differences are found
+(for example, to fail a CI job), add the `--exit-code` flag:
+
+```console
+ncompare S001G01.nc S001G01_SUBSET.nc --exit-code
+```
+
 ### In a Python kernel:
 
 ```python

@@ -82,6 +82,14 @@ def _cli(args: Sequence[str] | None) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--exit-code",
+        action="store_true",
+        default=False,
+        help="Return a non-zero exit code if any differences are found "
+        "(useful in scripts and CI); default behavior always exits 0 on success",
+    )
+
+    parser.add_argument(
         "--column-widths",
         nargs=3,
         default=None,
@@ -105,6 +113,9 @@ def main() -> None:  # pragma: no cover
     args = _cli(None)
 
     delattr(args, "version")
+    # `exit_code` is a CLI-only concern; it isn't a parameter of `compare`.
+    exit_on_difference = args.exit_code
+    delattr(args, "exit_code")
 
     try:
         total_diff_count = compare(**vars(args))
@@ -112,6 +123,8 @@ def main() -> None:  # pragma: no cover
         print(traceback.format_exc())
         sys.exit(1)
     print(total_diff_count)
+    if exit_on_difference and (total_diff_count > 0):
+        sys.exit(1)  # differences found, and the caller asked us to signal that
     sys.exit(0)  # a clean, no-issue, exit
 
 
