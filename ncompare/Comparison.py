@@ -8,6 +8,7 @@ from colorama import Fore
 from ncompare.getters import (
     get_and_check_variable_attributes,
     get_and_check_variable_scale_factor,
+    get_root_attributes,
     get_root_dims,
     get_root_groups,
     get_subgroups,
@@ -65,6 +66,8 @@ class Comparison:
         """
         self._print_root_dimensions()
         self._print_root_groups()
+        if self.show_attributes:
+            self._print_root_attributes()
 
         # Run through all the rest of the groups and variables, tallying differences along the way.
         self.out.print(Fore.LIGHTBLUE_EX + "\nAll variables:", add_to_history=True)
@@ -277,6 +280,26 @@ class Comparison:
         list_a = get_root_groups(self.file1)
         list_b = get_root_groups(self.file2)
         _, _, _ = self.out.lists_diff(list_a, list_b)
+
+    def _print_root_attributes(self):
+        # Show the global (root-level) attributes of each file and evaluate differences.
+        self.out.print(Fore.LIGHTBLUE_EX + "\nRoot-level Attributes:", add_to_history=True)
+        attrs_a = get_root_attributes(self.file1)
+        attrs_b = get_root_attributes(self.file2)
+
+        for _, attr_a_key, attr_b_key in common_elements(attrs_a.keys(), attrs_b.keys()):
+            # Check whether attr_a_key is empty,
+            # because it might be if the attribute doesn't exist in File A.
+            attribute_key = attr_a_key if attr_a_key else attr_b_key
+            diff_condition: SummaryDifferenceKeys = self.out.side_by_side(
+                f"{attribute_key}:",
+                attrs_a.get(attr_a_key, ""),
+                attrs_b.get(attr_b_key, ""),
+                highlight_diff=True,
+            )
+            self.num_attribute_diffs[diff_condition] += 1
+            if diff_condition in ("left", "right", "both"):
+                self.num_attribute_diffs["difference_types"].add(attribute_key)
 
     def _print_summary(self):
         """Print summary counts of similarities and differences."""

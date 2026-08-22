@@ -67,6 +67,20 @@ def get_root_groups(file: FileToCompare) -> list:
     return groups_list
 
 
+def get_root_attributes(file: FileToCompare) -> dict:
+    """Get a dict of global (root-level) attributes from a netCDF or HDF5 file."""
+    attributes: dict = {}
+    if file.type == "netcdf":
+        with netCDF4.Dataset(file.path) as dataset:
+            for name in dataset.ncattrs():
+                attributes[name] = str(dataset.getncattr(name))
+    elif file.type == "hdf5":
+        with h5py.File(file.path) as dataset:
+            for name in dataset.attrs.keys():
+                attributes[name] = str(dataset.attrs[name])
+    return attributes
+
+
 def get_subgroups(node: netCDF4.Dataset | netCDF4.Group | h5py.Group, file_type: str) -> list:
     """Get a list of subgroups from a netCDF or HDF5 group.
 

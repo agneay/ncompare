@@ -31,6 +31,7 @@ Note that full comparison tests are performed in both directions, i.e., A -> B a
 
 from contextlib import nullcontext as does_not_raise
 
+import netCDF4 as nC
 import pytest
 
 from ncompare.core import compare
@@ -72,6 +73,42 @@ def test_no_error_compare_2groupsTo1Subgroup(
 
 def test_zero_for_comparison_with_no_differences(ds_3dims_3vars_4coords_1subgroup):
     assert compare(ds_3dims_3vars_4coords_1subgroup, ds_3dims_3vars_4coords_1subgroup) == 0
+
+
+def test_root_attributes_included_when_show_attributes(tmp_path):
+    path_a = tmp_path / "test_root_attrs_a.nc"
+    with nC.Dataset(path_a, mode="w") as ds:
+        ds.setncattr("title", "Dataset A")
+        ds.setncattr("shared_attr", "same")
+
+    path_b = tmp_path / "test_root_attrs_b.nc"
+    with nC.Dataset(path_b, mode="w") as ds:
+        ds.setncattr("title", "Dataset B")
+        ds.setncattr("shared_attr", "same")
+
+    out_path = tmp_path / "output_with_attrs.txt"
+    num_differences = compare(path_a, path_b, show_attributes=True, file_text=str(out_path))
+
+    assert num_differences > 0
+    contents = out_path.read_text()
+    assert "Root-level Attributes:" in contents
+    assert "title:" in contents
+
+
+def test_root_attributes_excluded_when_not_show_attributes(tmp_path):
+    path_a = tmp_path / "test_root_attrs_a.nc"
+    with nC.Dataset(path_a, mode="w") as ds:
+        ds.setncattr("title", "Dataset A")
+
+    path_b = tmp_path / "test_root_attrs_b.nc"
+    with nC.Dataset(path_b, mode="w") as ds:
+        ds.setncattr("title", "Dataset B")
+
+    out_path = tmp_path / "output_without_attrs.txt"
+    compare(path_a, path_b, show_attributes=False, file_text=str(out_path))
+
+    contents = out_path.read_text()
+    assert "Root-level Attributes:" not in contents
 
 
 @pytest.mark.integration
