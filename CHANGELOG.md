@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Resolve each variable's HDF5 object-reference attributes against its own file (File B was incorrectly dereferenced against File A), and use the correct parent-group name when building nested group paths during traversal ([#341](https://github.com/nasa/ncompare/issues/341)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Read HDF5 root-level dimensions via h5py dimension scales and degrade gracefully when they can't be introspected, so `ncompare` no longer crashes on non-netCDF4 HDF5 files ([#357](https://github.com/nasa/ncompare/issues/357)) ([**@danielfromearth**](https://github.com/danielfromearth))
 
 ## [1.14.0] - 2025-12-30
 

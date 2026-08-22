@@ -97,27 +97,51 @@ def get_variables(node: netCDF4.Dataset | netCDF4.Group | h5py.Group, file_type:
 
 
 def get_root_dims(file: FileToCompare) -> list:
-    """Get a list of dimensions from a netCDF or HDF5."""
+    """Get a list of root-level dimensions from a netCDF or HDF5 file."""
+    if file.type == "hdf5":
+        return _get_hdf5_root_dims(file.path)
+    return _get_netcdf_root_dims(file.path)
+
+
+def _get_netcdf_root_dims(path) -> list:
+    """Get a list of root-level dimensions from a netCDF file (via xarray)."""
 
     def __get_dim_list(decode_times=True):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            if file.type == "netcdf":
-                xarray_engine = "netcdf4"
-            elif file.type == "hdf5":
-                xarray_engine = "h5netcdf"
-
-            with xr.open_dataset(
-                file.path, decode_times=decode_times, engine=xarray_engine
-            ) as dataset:
+            with xr.open_dataset(path, decode_times=decode_times, engine="netcdf4") as dataset:
                 return list(dataset.sizes.items())
 
     try:
-        dims_list = __get_dim_list()
+        return __get_dim_list()
     except ValueError as err:
         if "decode_times" in str(err):  # then try again without decoding the times
-            dims_list = __get_dim_list(decode_times=False)
-        else:
-            raise err from None  # "from None" prevents additional trace (see https://stackoverflow.com/a/18188660)
+            return __get_dim_list(decode_times=False)
+        raise err from None  # "from None" prevents additional trace (see https://stackoverflow.com/a/18188660)
 
-    return dims_list
+
+def _get_hdf5_root_dims(path) -> list:
+    """Get a list of root-level dimensions from an HDF5 file (via h5py).
+
+    HDF5 has no netCDF-style named dimensions; they are represented by optional
+    HDF5 dimension scales. Files with dimension scales -- including netCDF4 files,
+    which are a subset of HDF5 -- report those; a pure HDF5 file with none reports
+    no root-level dimensions rather than raising, so the rest of the structural
+    comparison can still proceed.
+    """
+    dims: list[tuple[str, int]] = []
+    try:
+        with h5py.File(path, "r") as dataset:
+            for name, obj in dataset.items():
+                if not isinstance(obj, h5py.Dataset):
+                    continue
+                class_attr = obj.attrs.get("CLASS")
+                if isinstance(class_attr, bytes):
+                    class_attr = class_attr.decode("utf-8", errors="replace")
+                if class_attr == "DIMENSION_SCALE":
+                    size = obj.shape[0] if obj.shape else obj.size
+                    dims.append((name, int(size)))
+    except (OSError, RuntimeError, KeyError):
+        # Some HDF5 files cannot be introspected for dimensions; degrade gracefully.
+        return []
+    return sorted(dims)
