@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Common Changelog](https://common-changelog.org/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Compute the returned difference total explicitly instead of via a side effect in the summary-printing code, so the total no longer depends on rendering having run first (printed output and returned total are unchanged) ([#351](https://github.com/nasa/ncompare/issues/351)) ([**@danielfromearth**](https://github.com/danielfromearth))
+
 ## [1.14.0] - 2025-12-30
 
 _Updates base Python version from 3.9 to 3.11._

@@ -74,14 +74,18 @@ class Comparison:
         self._print_summary()
 
         # Return the total number of differences; zero indicates no differences were found.
-        total_diff_count = sum(
-            [
-                x["left"] + x["right"]
-                for x in [self.num_var_diffs, self.num_group_diffs, self.num_attribute_diffs]
-            ]
-        )
+        return self._total_difference_count()
 
-        return total_diff_count
+    def _total_difference_count(self) -> int:
+        """Total number of differences across variables, groups, and attributes.
+
+        A "both" difference (an item present on both sides but differing in value) is
+        counted on each side, matching the non-shared counts shown in the summary.
+        """
+        return sum(
+            counts["left"] + counts["right"] + 2 * counts["both"]
+            for counts in (self.num_var_diffs, self.num_group_diffs, self.num_attribute_diffs)
+        )
 
     def _traverse_hierarchy(self):
         self.out.side_by_side(
@@ -302,9 +306,10 @@ class Comparison:
         item_type: str,
         diff_dictionary: SummaryDifferencesDict,
     ) -> None:
-        # Tally up instances where there were non-empty entries on both left and right sides.
-        diff_dictionary["left"] += diff_dictionary["both"]
-        diff_dictionary["right"] += diff_dictionary["both"]
+        # A "both" difference (present on both sides but differing) counts on each side.
+        # Compute the display values locally, without mutating the tally dictionary.
+        non_shared_left = diff_dictionary["left"] + diff_dictionary["both"]
+        non_shared_right = diff_dictionary["right"] + diff_dictionary["both"]
 
         self.out.side_by_side(
             f"Total # of shared {item_type}s:",
@@ -315,8 +320,8 @@ class Comparison:
 
         self.out.side_by_side(
             f"Total # of non-shared {item_type}s:",
-            str(diff_dictionary["left"]),
-            str(diff_dictionary["right"]),
+            str(non_shared_left),
+            str(non_shared_right),
             force_display_even_if_same=True,
         )
 
