@@ -24,9 +24,35 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 
+from colorama import Fore, Style
+
+from ncompare.printing import Outputter
+
+
 def test_list_of_strings_diff(outputter_to_console):
     left, right, shared = outputter_to_console.lists_diff(
         ["hey", "yo", "beebop"], ["what", "is", "this", "beebop"]
     )
 
     assert (left, right, shared) == (2, 3, 1)
+
+
+def test_no_color_state_is_restored_after_context_exit():
+    """`no_color=True` must not permanently blank colorama's global Fore/Style.
+
+    Regression test: previously the color singletons were blanked and never
+    restored, so a no-color comparison left later comparisons (and any other
+    in-process colorama users) colorless.
+    """
+    original_red = Fore.RED
+    original_reset = Style.RESET_ALL
+    assert original_red != ""  # sanity check: colors are present to begin with
+
+    with Outputter(no_color=True):
+        # Colors are stripped while the no-color Outputter is active.
+        assert Fore.RED == ""
+        assert Style.RESET_ALL == ""
+
+    # ...and restored on exit, so subsequent output can be colorized again.
+    assert Fore.RED == original_red
+    assert Style.RESET_ALL == original_reset

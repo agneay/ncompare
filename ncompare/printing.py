@@ -113,11 +113,22 @@ class Outputter:
         else:
             self._column_widths = tuple(default_widths)
 
+        # When color is turned off, colorama's process-wide `Fore`/`Style`
+        # singletons are blanked so that (a) no ANSI codes are emitted and
+        # (b) column alignment is computed on codeless strings. Because those
+        # singletons are global, the original values are saved here and restored
+        # in `__exit__`, keeping the mutation scoped to this Outputter's lifetime
+        # rather than leaking across `compare()` calls or to other libraries.
+        self._no_color = no_color
+        self._saved_fore: dict | None = None
+        self._saved_style: dict | None = None
         if no_color:
             # Replace colorized styles with blank strings.
-            for k, _ in Fore.__dict__.items():
+            self._saved_fore = dict(Fore.__dict__)
+            self._saved_style = dict(Style.__dict__)
+            for k in list(Fore.__dict__):
                 Fore.__dict__[k] = ""
-            for k, _ in Style.__dict__.items():
+            for k in list(Style.__dict__):
                 Style.__dict__[k] = ""
         else:
             colorama.init(autoreset=True)
@@ -138,6 +149,12 @@ class Outputter:
     def __exit__(self, exc_type, exc_value, exc_traceback):  # noqa: D105
         if self._text_file_obj:
             self._text_file_obj.close()
+        # Restore the global colorama state that was blanked for no-color output,
+        # so color settings don't leak to later Outputters or other libraries.
+        if self._saved_fore is not None:
+            Fore.__dict__.update(self._saved_fore)
+        if self._saved_style is not None:
+            Style.__dict__.update(self._saved_style)
 
     def print(
         self,

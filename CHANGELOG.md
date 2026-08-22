@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Common Changelog](https://common-changelog.org/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Restore colorama's global color state after a no-color comparison, so `no_color=True` no longer permanently disables color for later comparisons or other libraries in the same process ([#345](https://github.com/nasa/ncompare/issues/345)) ([**@danielfromearth**](https://github.com/danielfromearth))
+
 ## [1.14.0] - 2025-12-30
 
 _Updates base Python version from 3.9 to 3.11._
