@@ -24,9 +24,20 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 
+import pytest
+
+from ncompare.printing import Outputter
+
+
 def test_list_of_strings_diff(outputter_to_console):
     left, right, shared = outputter_to_console.lists_diff(
         ["hey", "yo", "beebop"], ["what", "is", "this", "beebop"]
     )
 
     assert (left, right, shared) == (2, 3, 1)
+
+
+def test_column_widths_wrong_length_raises():
+    """Passing other than three column widths is rejected with a ValueError (not an assert)."""
+    with pytest.raises(ValueError):
+        Outputter(column_widths=(10, 20))
