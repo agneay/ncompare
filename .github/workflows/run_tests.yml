@@ -21,11 +21,11 @@ on:
 jobs:
   build_and_test:
     runs-on: ubuntu-latest
-    # Exposed as env so the integration step can be skipped when unavailable
-    # (e.g., pull requests from forks, which have no access to secrets).
+    # A non-secret boolean recording whether Earthdata credentials were provided,
+    # used only to gate the integration step. The credential values themselves are
+    # set on that step alone (below), never job-wide.
     env:
-      EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}
-      EARTHDATA_PASSWORD: ${{ secrets.EARTHDATA_PASSWORD }}
+      HAS_EARTHDATA_CREDS: ${{ secrets.EARTHDATA_USERNAME != '' && secrets.EARTHDATA_PASSWORD != '' }}
     strategy:
       matrix:
         python-version: [ '3.11', '3.12', '3.13', '3.14' ]
@@ -59,9 +59,13 @@ jobs:
           uv run pytest -v -m "not integration" --cov=ncompare --cov-report=
 
       - name: Run integration tests with coverage
-        # Skipped when Earthdata credentials are unavailable (e.g., fork PRs);
-        # EARTHDATA_USERNAME/PASSWORD come from the job-level env above.
-        if: ${{ env.EARTHDATA_USERNAME != '' }}
+        # Runs only when Earthdata credentials are provided -- post-merge via
+        # version-and-build.yml. Skipped on pull requests (and forks), which do
+        # not receive the secrets. Credential values are scoped to this step.
+        if: ${{ env.HAS_EARTHDATA_CREDS == 'true' }}
+        env:
+          EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}
+          EARTHDATA_PASSWORD: ${{ secrets.EARTHDATA_PASSWORD }}
         run: |
           uv run pytest -v -m integration --cov=ncompare --cov-append --cov-report=
 

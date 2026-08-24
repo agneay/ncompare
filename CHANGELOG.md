@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Run the unit and integration test suite on pull requests targeting `develop` and `main` (previously only PRs based on `feature/**`/`issue/**` triggered tests), passing the Earthdata secrets through so integration runs; integration is skipped when credentials are unavailable (e.g., pull requests from forks) ([#355](https://github.com/nasa/ncompare/issues/355)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Run the unit test suite on pull requests targeting `develop` and `main` (previously only PRs based on `feature/**`/`issue/**` triggered tests). Integration tests, which require Earthdata credentials, are not run on pull requests and continue to run post-merge via `version-and-build.yml` ([#355](https://github.com/nasa/ncompare/issues/355)) ([**@danielfromearth**](https://github.com/danielfromearth))
 
 ### Fixed
 
