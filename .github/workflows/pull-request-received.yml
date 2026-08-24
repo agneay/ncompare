@@ -1,11 +1,13 @@
 name: Receive PR
 
-# read-only repo token
-# no access to secrets
+# Runs the test suite on pull requests. Only `codecov_token` is passed -- the
+# Earthdata secrets are intentionally NOT exposed to PR-triggered runs, so the
+# integration tests are skipped on PRs while the unit tests still run. Integration
+# runs post-merge via version-and-build.yml, which provides the Earthdata secrets.
 on:
   pull_request:
-    # Sequence of patterns matched against refs/heads
-    branches: [ feature/**, issue/**, issues/** ]
+    # Matched against the base branch (the branch the PR targets).
+    branches: [ develop, main, feature/**, issue/**, issues/** ]
 
 jobs:
   run_tests:

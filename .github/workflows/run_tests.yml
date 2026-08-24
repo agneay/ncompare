@@ -12,15 +12,20 @@ on:
         required: true
       EARTHDATA_USERNAME:
         description: 'NASA Earthdata username'
-        required: true
+        required: false
       EARTHDATA_PASSWORD:
         description: 'NASA Earthdata password'
-        required: true
+        required: false
   workflow_dispatch:
 
 jobs:
   build_and_test:
     runs-on: ubuntu-latest
+    # A non-secret boolean recording whether Earthdata credentials were provided,
+    # used only to gate the integration step. The credential values themselves are
+    # set on that step alone (below), never job-wide.
+    env:
+      HAS_EARTHDATA_CREDS: ${{ secrets.EARTHDATA_USERNAME != '' && secrets.EARTHDATA_PASSWORD != '' }}
     strategy:
       matrix:
         python-version: [ '3.11', '3.12', '3.13', '3.14' ]
@@ -54,6 +59,10 @@ jobs:
           uv run pytest -v -m "not integration" --cov=ncompare --cov-report=
 
       - name: Run integration tests with coverage
+        # Runs only when Earthdata credentials are provided -- post-merge via
+        # version-and-build.yml. Skipped on pull requests (and forks), which do
+        # not receive the secrets. Credential values are scoped to this step.
+        if: ${{ env.HAS_EARTHDATA_CREDS == 'true' }}
         env:
           EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}
           EARTHDATA_PASSWORD: ${{ secrets.EARTHDATA_PASSWORD }}
