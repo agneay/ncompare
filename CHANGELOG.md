@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Resolve each variable's HDF5 object-reference attributes against its own file (File B was incorrectly dereferenced against File A), and use the correct parent-group name when building nested group paths during traversal ([#341](https://github.com/nasa/ncompare/issues/341)) ([**@danielfromearth**](https://github.com/danielfromearth))
 - Read HDF5 root-level dimensions via h5py dimension scales and degrade gracefully when they can't be introspected, so `ncompare` no longer crashes on non-netCDF4 HDF5 files ([#357](https://github.com/nasa/ncompare/issues/357)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Pin the ATL06 granule version in the integration test so its difference count is reproducible; NASA reprocessed ATL06 (006 → 007), which had changed the count and broken CI ([#359](https://github.com/nasa/ncompare/issues/359)) ([**@danielfromearth**](https://github.com/danielfromearth))
 
 ## [1.14.0] - 2025-12-30
 

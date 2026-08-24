@@ -62,20 +62,29 @@ def earthdata_auth():
     return True
 
 
+# Pin the ATL06 version so the comparison -- and its difference count -- is
+# reproducible. ATL06 is periodically reprocessed (e.g., 006 -> 007), which changes
+# the data and would otherwise change the expected count in test_icesat.
+ATL06_VERSION = "007"
+
+
 @pytest.fixture(scope="session")
 def icesat2_atl06_granule_1(icesat2_cache_dir, earthdata_auth):
     """
     Download or use cached ICESat-2 ATL06 granule #1 for comparison tests.
     Temporal range: 2023-08-16 16:16:15 to 2023-08-16 16:25:00
     """
-    # Check if already cached
-    cached_files = list(icesat2_cache_dir.glob("ATL06_20230816161508_*.h5"))
+    # Check if already cached (version-specific, so a stale version isn't reused)
+    cached_files = list(icesat2_cache_dir.glob(f"ATL06_20230816161508_*_{ATL06_VERSION}_*.h5"))
     if cached_files:
         return str(cached_files[0])
 
     # Download if not cached
     results = earthaccess.search_data(
-        short_name="ATL06", temporal=("2023-08-16 16:16:15", "2023-08-16 16:25:00"), count=1
+        short_name="ATL06",
+        version=ATL06_VERSION,
+        temporal=("2023-08-16 16:16:15", "2023-08-16 16:25:00"),
+        count=1,
     )
 
     if not results:
@@ -96,14 +105,17 @@ def icesat2_atl06_granule_2(icesat2_cache_dir, earthdata_auth):
     Download or use cached ICESat-2 ATL06 granule #2 for comparison tests.
     Temporal range: 2023-08-16 23:46:00 to 2023-08-16 23:48:00
     """
-    # Check if already cached
-    cached_files = list(icesat2_cache_dir.glob("ATL06_20230816234629_*.h5"))
+    # Check if already cached (version-specific, so a stale version isn't reused)
+    cached_files = list(icesat2_cache_dir.glob(f"ATL06_20230816234629_*_{ATL06_VERSION}_*.h5"))
     if cached_files:
         return str(cached_files[0])
 
     # Download if not cached
     results = earthaccess.search_data(
-        short_name="ATL06", temporal=("2023-08-16 23:46:00", "2023-08-16 23:48:00"), count=1
+        short_name="ATL06",
+        version=ATL06_VERSION,
+        temporal=("2023-08-16 23:46:00", "2023-08-16 23:48:00"),
+        count=1,
     )
 
     if not results:
