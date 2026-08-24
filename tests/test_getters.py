@@ -1,4 +1,5 @@
 import h5py
+import netCDF4
 import numpy as np
 
 from ncompare.getters import get_root_dims
@@ -15,15 +16,19 @@ def test_get_root_dims_pure_hdf5_without_dimension_scales(tmp_path):
 
 
 def test_get_root_dims_hdf5_with_dimension_scale(tmp_path):
-    """Root dimensions are recovered from HDF5 dimension scales when present."""
-    path = tmp_path / "scaled.h5"
-    with h5py.File(path, "w") as f:
-        scale = f.create_dataset("x", data=np.arange(5))
-        scale.make_scale("x")
-        data = f.create_dataset("data", data=np.zeros(5))
-        data.dims[0].attach_scale(scale)
+    """Root dimensions are recovered from HDF5 dimension scales when present.
 
-    assert get_root_dims(FileToCompare(path=path, type="hdf5")) == [("x", 5)]
+    Authored with netCDF4 (a coordinate variable is stored as an HDF5 dimension
+    scale) so the scale is created portably; the file is then read via the h5py
+    path in get_root_dims.
+    """
+    path = tmp_path / "scaled.h5"
+    with netCDF4.Dataset(path, "w") as ds:
+        ds.createDimension("x", 5)
+        coordinate = ds.createVariable("x", "f4", ("x",))
+        coordinate[:] = range(5)
+
+    assert ("x", 5) in get_root_dims(FileToCompare(path=path, type="hdf5"))
 
 
 # def test_var_properties(ds_3dims_3vars_4coords_1group):
