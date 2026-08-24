@@ -91,7 +91,9 @@ def test_icesat(temp_data_dir, icesat2_atl06_granule_1, icesat2_atl06_granule_2)
     assert num_differences > 0, "Expected to find differences between granules"
     assert out_path.exists(), "Output file was not created"
 
-    assert num_differences == 5280
+    # Exact count for the pinned ATL06 version (see ATL06_VERSION in conftest.py).
+    # Update this if that version is changed; ATL06 reprocessing changes the data.
+    assert num_differences == 4958
 
 
 @pytest.mark.integration
