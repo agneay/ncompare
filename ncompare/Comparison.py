@@ -432,7 +432,13 @@ class Comparison:
                 v_dimensions = str(the_variable.dimensions)
             elif self.file_types == "hdf5":
                 dim_list: list[str] = []
-                for dim in the_variable.dims:
+                # Accessing `.dims` can raise on HDF5 files whose dimension scales
+                # can't be introspected; treat those as having no dimensions.
+                try:
+                    variable_dims = list(the_variable.dims)
+                except RuntimeError:
+                    variable_dims = []
+                for dim in variable_dims:
                     try:
                         dim_list.append(dim.label)
                     except RuntimeError:
