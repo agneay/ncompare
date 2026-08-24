@@ -183,13 +183,15 @@ class Comparison:
 
         # Go through each variable in the current group.
         for variable_pair in common_elements(vars_a_sorted, vars_b_sorted):
-            # Get and print the properties of each variable
+            # Get and print the properties of each variable.
+            # Note: each variable's object-reference attributes must be resolved
+            # against its *own* file, so File B uses open_file2 (not open_file1).
             self._print_var_properties_side_by_side(
                 self._create_var_properties(
                     group_a, variable_pair[1], original_dataset=self.open_file1
                 ),
                 self._create_var_properties(
-                    group_b, variable_pair[2], original_dataset=self.open_file1
+                    group_b, variable_pair[2], original_dataset=self.open_file2
                 ),
             )
 
@@ -385,7 +387,7 @@ class Comparison:
             )
             subnode_a_subgroups = get_subgroups(subnode_a, file_type=self.file_types)
 
-            subnode_b_name = node_a_name + "/" + subgroup_b_name if subgroup_b_name else ""
+            subnode_b_name = node_b_name + "/" + subgroup_b_name if subgroup_b_name else ""
             subnode_b = (
                 node_b[subgroup_b_name]
                 if (subgroup_b_name and (subgroup_b_name in node_b_subgroups))
@@ -433,7 +435,13 @@ class Comparison:
                 v_dimensions = str(the_variable.dimensions)
             elif self.file_types == "hdf5":
                 dim_list: list[str] = []
-                for dim in the_variable.dims:
+                # Accessing `.dims` can raise on HDF5 files whose dimension scales
+                # can't be introspected; treat those as having no dimensions.
+                try:
+                    variable_dims = list(the_variable.dims)
+                except RuntimeError:
+                    variable_dims = []
+                for dim in variable_dims:
                     try:
                         dim_list.append(dim.label)
                     except RuntimeError:
