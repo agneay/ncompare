@@ -1,9 +1,9 @@
 name: Receive PR
 
-# Runs the test suite on pull requests. Only `codecov_token` is passed -- the
-# Earthdata secrets are intentionally NOT exposed to PR-triggered runs, so the
-# integration tests are skipped on PRs while the unit tests still run. Integration
-# runs post-merge via version-and-build.yml, which provides the Earthdata secrets.
+# Runs the test suite on pull requests. The suite needs no credentials beyond
+# `codecov_token`: tests that reach live NASA Earthdata are marked `integration`
+# and excluded everywhere in CI, and the ATL06 comparison they cover runs here
+# against committed structure-only fixtures instead.
 on:
   pull_request:
     # Matched against the base branch (the branch the PR targets).

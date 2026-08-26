@@ -74,9 +74,51 @@ def test_zero_for_comparison_with_no_differences(ds_3dims_3vars_4coords_1subgrou
     assert compare(ds_3dims_3vars_4coords_1subgroup, ds_3dims_3vars_4coords_1subgroup) == 0
 
 
+# Number of differences between the two ATL06 granules, for the pinned version
+# (see ATL06_VERSION in conftest.py). The structural fixtures reproduce the real
+# granules' count exactly, so the hermetic test below and the opt-in test against
+# real granules assert against this one value.
+EXPECTED_ATL06_DIFFERENCES = 4958
+
+
+def test_icesat_structure(temp_data_dir, atl06_structure_granule_1, atl06_structure_granule_2):
+    """Compare two real-world-complex ATL06 structures, without touching the network."""
+    out_path = temp_data_dir / "output_file_icesat-2-atl06_structure.txt"
+
+    num_differences = compare(
+        atl06_structure_granule_1,
+        atl06_structure_granule_2,
+        show_chunks=True,
+        show_attributes=True,
+        file_text=str(out_path),
+    )
+
+    assert num_differences > 0, "Expected to find differences between granules"
+    assert out_path.exists(), "Output file was not created"
+    assert num_differences == EXPECTED_ATL06_DIFFERENCES
+
+
+def test_error_on_different_file_types(atl06_structure_granule_1):
+    file2 = data_for_tests_dir / "test_a.nc"
+
+    with pytest.raises(TypeError):
+        compare(atl06_structure_granule_1, file2)
+
+
 @pytest.mark.integration
 def test_icesat(temp_data_dir, icesat2_atl06_granule_1, icesat2_atl06_granule_2):
-    # Compare the `ncompare` output when testing ICESat
+    """Verify the real granules still match the committed structural fixtures.
+
+    This is the one test that reaches live NASA Earthdata, so it is deselected by
+    default and never runs in CI -- an outage there says nothing about this
+    codebase. Run it deliberately with ``pytest -m integration`` (which needs
+    Earthdata credentials, via ``.netrc`` or the EARTHDATA_* environment
+    variables) when changing how files are read, or to check whether ATL06 has
+    been reprocessed.
+
+    A mismatch does not mean ncompare is broken: it means the real collection has
+    moved on from the fixtures.
+    """
     out_path = temp_data_dir / "output_file_icesat-2-atl06.txt"
 
     num_differences = compare(
@@ -87,18 +129,14 @@ def test_icesat(temp_data_dir, icesat2_atl06_granule_1, icesat2_atl06_granule_2)
         file_text=str(out_path),
     )
 
-    # Verify that differences were found and output was written
     assert num_differences > 0, "Expected to find differences between granules"
     assert out_path.exists(), "Output file was not created"
 
-    # Exact count for the pinned ATL06 version (see ATL06_VERSION in conftest.py).
-    # Update this if that version is changed; ATL06 reprocessing changes the data.
-    assert num_differences == 4958
-
-
-@pytest.mark.integration
-def test_error_on_different_file_types(temp_data_dir, icesat2_atl06_granule_1):
-    file2 = data_for_tests_dir / "test_a.nc"
-
-    with pytest.raises(TypeError):
-        compare(icesat2_atl06_granule_1, file2)
+    # A mismatch here means the real granules have drifted from the fixtures --
+    # most likely an ATL06 reprocessing. Regenerate with
+    # scripts/make_atl06_structural_fixtures.py.
+    assert num_differences == EXPECTED_ATL06_DIFFERENCES, (
+        f"Real granules produced {num_differences} differences but the structural "
+        f"fixtures expect {EXPECTED_ATL06_DIFFERENCES}. If ATL06 was reprocessed, "
+        "regenerate the fixtures with scripts/make_atl06_structural_fixtures.py."
+    )
