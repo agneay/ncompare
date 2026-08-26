@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Run the unit test suite on pull requests targeting `develop` and `main` (previously only PRs based on `feature/**`/`issue/**` triggered tests). Integration tests, which require Earthdata credentials, are not run on pull requests and continue to run post-merge via `version-and-build.yml` ([#355](https://github.com/nasa/ncompare/issues/355)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Internal cleanup with no change to comparison output: remove dead code, compute each variable's scale factor and attributes once instead of twice, and add missing Apache license headers ([#347](https://github.com/nasa/ncompare/issues/347)) ([**@danielfromearth**](https://github.com/danielfromearth))
 
 ### Fixed
 
