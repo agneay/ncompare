@@ -58,10 +58,21 @@ jobs:
         run: |
           uv run pytest -v -m "not integration" --cov=ncompare --cov-report=
 
+      - name: Prefer IPv4 for Earthdata
+        # urs.earthdata.nasa.gov is dual-stack, but GitHub-hosted runners have no
+        # IPv6 egress. When address selection (RFC 6724) picks the AAAA record,
+        # the connection fails instantly with "[Errno 101] Network is
+        # unreachable". Raising IPv4's precedence avoids that. Only needed for
+        # the step below, the sole step that reaches Earthdata.
+        if: ${{ env.HAS_EARTHDATA_CREDS == 'true' }}
+        run: sudo sh -c 'echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf'
+
       - name: Run integration tests with coverage
-        # Runs only when Earthdata credentials are provided -- post-merge via
-        # version-and-build.yml. Skipped on pull requests (and forks), which do
-        # not receive the secrets. Credential values are scoped to this step.
+        # Runs only when Earthdata credentials are provided -- nightly, via
+        # nightly-integration.yml. Skipped on pull requests (and forks) and on
+        # merges, which do not receive the secrets. The structural equivalent of
+        # this comparison runs everywhere as a unit test, using committed
+        # fixtures. Credential values are scoped to this step.
         if: ${{ env.HAS_EARTHDATA_CREDS == 'true' }}
         env:
           EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}
