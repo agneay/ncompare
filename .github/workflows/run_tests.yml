@@ -68,11 +68,19 @@ jobs:
         run: sudo sh -c 'echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf'
 
       - name: Run integration tests with coverage
-        # Runs only when Earthdata credentials are provided -- nightly, via
-        # nightly-integration.yml. Skipped on pull requests (and forks) and on
-        # merges, which do not receive the secrets. The structural equivalent of
-        # this comparison runs everywhere as a unit test, using committed
-        # fixtures. Credential values are scoped to this step.
+        # Reaches live NASA Earthdata, so it is deliberately not part of any
+        # automatic run: no caller passes these secrets, and pull requests (and
+        # forks) never receive them. Run it on demand by dispatching this
+        # workflow, which is worth doing when changing how files are read or
+        # before a release.
+        #
+        # Nothing about ncompare is left untested by default: the same ATL06
+        # comparison runs everywhere as a unit test against committed
+        # structure-only fixtures. What this adds is confirmation that the real
+        # granules still match those fixtures -- which only changes when NASA
+        # reprocesses the collection.
+        #
+        # Credential values are scoped to this step.
         if: ${{ env.HAS_EARTHDATA_CREDS == 'true' }}
         env:
           EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}

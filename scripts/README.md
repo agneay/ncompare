@@ -17,8 +17,9 @@ uv run python scripts/make_atl06_structural_fixtures.py <granule_1.h5> <granule_
 ```
 
 Only needed when the fixtures should track a different ATL06 version. It reads
-real granules, so obtaining those requires Earthdata credentials; the nightly
-integration workflow downloads them at `~/.cache/icesat2_test_data/`.
+real granules, so obtaining those requires Earthdata credentials; running
+`pytest -m integration` downloads and caches them at
+`~/.cache/icesat2_test_data/`.
 
 After regenerating, run `pytest -k icesat_structure` and update
 `EXPECTED_ATL06_DIFFERENCES` in `tests/test_core.py` if the count legitimately

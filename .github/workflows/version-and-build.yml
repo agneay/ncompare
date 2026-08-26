@@ -14,9 +14,10 @@ jobs:
     uses: ./.github/workflows/run_tests.yml
     # Earthdata credentials are deliberately not passed here, so the tests that
     # reach the live Earthdata services do not run on merge -- a NASA outage or
-    # network problem should not be able to break `develop`. Those tests run on a
-    # schedule instead (nightly-integration.yml); the structural comparison they
-    # cover runs here as a unit test, from committed fixtures.
+    # network problem should not be able to break `develop`. The structural
+    # comparison they cover runs here as an ordinary unit test, from committed
+    # fixtures; the live-service check is available on demand by dispatching
+    # run_tests.yml.
     secrets:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
 

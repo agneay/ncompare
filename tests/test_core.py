@@ -76,9 +76,8 @@ def test_zero_for_comparison_with_no_differences(ds_3dims_3vars_4coords_1subgrou
 
 # Number of differences between the two ATL06 granules, for the pinned version
 # (see ATL06_VERSION in conftest.py). The structural fixtures reproduce the real
-# granules' count exactly, so both the hermetic test and the nightly real-network
-# canary assert against this one value. If ATL06 is reprocessed, the canary is
-# what reports it -- regenerate the fixtures and update this number together.
+# granules' count exactly, so the hermetic test below and the opt-in test against
+# real granules assert against this one value.
 EXPECTED_ATL06_DIFFERENCES = 4958
 
 
@@ -110,9 +109,14 @@ def test_error_on_different_file_types(atl06_structure_granule_1):
 def test_icesat(temp_data_dir, icesat2_atl06_granule_1, icesat2_atl06_granule_2):
     """Verify the real granules still match the committed structural fixtures.
 
-    This is the one test that exercises the live earthaccess/CMR download path.
-    It runs nightly rather than on merge, so an Earthdata outage cannot break
-    `develop`; see .github/workflows/nightly-integration.yml.
+    This is the one test that reaches live NASA Earthdata, so it is deselected by
+    default and never runs automatically in CI -- an outage there says nothing
+    about this codebase. Run it deliberately (``pytest -m integration``, or by
+    dispatching run_tests.yml with Earthdata credentials) when changing how files
+    are read, or to check whether ATL06 has been reprocessed.
+
+    A mismatch does not mean ncompare is broken: it means the real collection has
+    moved on from the fixtures.
     """
     out_path = temp_data_dir / "output_file_icesat-2-atl06.txt"
 
