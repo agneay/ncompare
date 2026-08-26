@@ -10,22 +10,11 @@ on:
     secrets:
       codecov_token:
         required: true
-      EARTHDATA_USERNAME:
-        description: 'NASA Earthdata username'
-        required: false
-      EARTHDATA_PASSWORD:
-        description: 'NASA Earthdata password'
-        required: false
   workflow_dispatch:
 
 jobs:
   build_and_test:
     runs-on: ubuntu-latest
-    # A non-secret boolean recording whether Earthdata credentials were provided,
-    # used only to gate the integration step. The credential values themselves are
-    # set on that step alone (below), never job-wide.
-    env:
-      HAS_EARTHDATA_CREDS: ${{ secrets.EARTHDATA_USERNAME != '' && secrets.EARTHDATA_PASSWORD != '' }}
     strategy:
       matrix:
         python-version: [ '3.11', '3.12', '3.13', '3.14' ]
@@ -54,41 +43,16 @@ jobs:
       - name: Run linting
         run: uv run ruff check ncompare
 
-      - name: Run unit tests with coverage
+      - name: Run tests with coverage
+        # Tests marked `integration` reach live NASA Earthdata and are excluded
+        # here. Nothing they cover is left untested: the ATL06 comparison runs
+        # as an ordinary test against committed structure-only fixtures. They
+        # exist for a developer to run deliberately (`pytest -m integration`)
+        # to confirm the real granules still match those fixtures.
         run: |
           uv run pytest -v -m "not integration" --cov=ncompare --cov-report=
 
-      - name: Prefer IPv4 for Earthdata
-        # urs.earthdata.nasa.gov is dual-stack, but GitHub-hosted runners have no
-        # IPv6 egress. When address selection (RFC 6724) picks the AAAA record,
-        # the connection fails instantly with "[Errno 101] Network is
-        # unreachable". Raising IPv4's precedence avoids that. Only needed for
-        # the step below, the sole step that reaches Earthdata.
-        if: ${{ env.HAS_EARTHDATA_CREDS == 'true' }}
-        run: sudo sh -c 'echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf'
-
-      - name: Run integration tests with coverage
-        # Reaches live NASA Earthdata, so it is deliberately not part of any
-        # automatic run: no caller passes these secrets, and pull requests (and
-        # forks) never receive them. Run it on demand by dispatching this
-        # workflow, which is worth doing when changing how files are read or
-        # before a release.
-        #
-        # Nothing about ncompare is left untested by default: the same ATL06
-        # comparison runs everywhere as a unit test against committed
-        # structure-only fixtures. What this adds is confirmation that the real
-        # granules still match those fixtures -- which only changes when NASA
-        # reprocesses the collection.
-        #
-        # Credential values are scoped to this step.
-        if: ${{ env.HAS_EARTHDATA_CREDS == 'true' }}
-        env:
-          EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}
-          EARTHDATA_PASSWORD: ${{ secrets.EARTHDATA_PASSWORD }}
-        run: |
-          uv run pytest -v -m integration --cov=ncompare --cov-append --cov-report=
-
-      - name: Generate combined coverage report
+      - name: Generate coverage report
         run: |
           uv run coverage xml -o build/reports/coverage${{ matrix.python-version }}.xml
           uv run coverage report

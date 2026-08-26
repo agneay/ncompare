@@ -110,10 +110,11 @@ def test_icesat(temp_data_dir, icesat2_atl06_granule_1, icesat2_atl06_granule_2)
     """Verify the real granules still match the committed structural fixtures.
 
     This is the one test that reaches live NASA Earthdata, so it is deselected by
-    default and never runs automatically in CI -- an outage there says nothing
-    about this codebase. Run it deliberately (``pytest -m integration``, or by
-    dispatching run_tests.yml with Earthdata credentials) when changing how files
-    are read, or to check whether ATL06 has been reprocessed.
+    default and never runs in CI -- an outage there says nothing about this
+    codebase. Run it deliberately with ``pytest -m integration`` (which needs
+    Earthdata credentials, via ``.netrc`` or the EARTHDATA_* environment
+    variables) when changing how files are read, or to check whether ATL06 has
+    been reprocessed.
 
     A mismatch does not mean ncompare is broken: it means the real collection has
     moved on from the fixtures.
