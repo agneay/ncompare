@@ -92,6 +92,10 @@ Following the convention used by `diff`, `cmp`, and `grep`:
 | `1`  | Compared successfully; differences found — only with `--exit-code`, which otherwise exits `0` |
 | `2`  | The comparison could not be completed (for example, a file is missing or unreadable, or an argument is invalid) |
 
+The comparison report and its difference count are written to standard output;
+diagnostics from a failed run go to standard error. So standard output stays
+parseable whether or not the run succeeds.
+
 Because a failed comparison is reported as `2` rather than `1`, a script can
 distinguish "the files differ" from "ncompare could not compare them":
 

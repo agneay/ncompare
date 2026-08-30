@@ -129,7 +129,10 @@ def main() -> None:  # pragma: no cover
     try:
         total_diff_count = compare(**vars(args))
     except Exception:  # pylint: disable=broad-exception-caught
-        print(traceback.format_exc())
+        # Diagnostics go to stderr, so that stdout carries only the comparison
+        # report and its difference count. That keeps stdout parseable by a
+        # caller even when the run fails.
+        print(traceback.format_exc(), file=sys.stderr)
         sys.exit(2)  # the comparison could not be completed
     print(total_diff_count)
     if exit_on_difference and (total_diff_count > 0):

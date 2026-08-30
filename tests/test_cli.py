@@ -24,6 +24,7 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 import os
+import subprocess
 
 from ncompare.console import _cli
 
@@ -90,3 +91,17 @@ def test_exit_code_2_when_comparison_fails():
 
     # argparse reports an invalid invocation with the same code.
     assert _exit_status("ncompare --not-a-real-flag") == 2
+
+
+def test_failure_diagnostics_go_to_stderr():
+    """Keep stdout parseable: the traceback belongs on stderr, not mixed into the report."""
+    missing = data_for_tests_dir / "does_not_exist.nc"
+    real = data_for_tests_dir / "test_a.nc"
+
+    result = subprocess.run(
+        ["ncompare", str(missing), str(real)], capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 2
+    assert "Traceback" in result.stderr
+    assert "Traceback" not in result.stdout
