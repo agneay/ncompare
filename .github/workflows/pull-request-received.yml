@@ -1,11 +1,13 @@
 name: Receive PR
 
-# read-only repo token
-# no access to secrets
+# Runs the test suite on pull requests. The suite needs no credentials beyond
+# `codecov_token`: tests that reach live NASA Earthdata are marked `integration`
+# and excluded everywhere in CI, and the ATL06 comparison they cover runs here
+# against committed structure-only fixtures instead.
 on:
   pull_request:
-    # Sequence of patterns matched against refs/heads
-    branches: [ feature/**, issue/**, issues/** ]
+    # Matched against the base branch (the branch the PR targets).
+    branches: [ develop, main, feature/**, issue/**, issues/** ]
 
 jobs:
   run_tests:
