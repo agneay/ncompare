@@ -25,7 +25,9 @@
 
 """Tests for the Comparison class."""
 
+import h5py
 import netCDF4
+import numpy as np
 import pytest
 
 from ncompare.Comparison import Comparison
@@ -63,6 +65,27 @@ def test_attributes_read_only_when_requested(tmp_path):
         comparison_on = Comparison(file, file, out, show_chunks=False, show_attributes=True)
         with netCDF4.Dataset(path) as ds:
             props_on = comparison_on._create_var_properties(ds, "temperature", original_dataset=ds)
+        assert props_on.attributes["units"] == "kelvin"
+
+
+def test_hdf5_attributes_read_only_when_requested(tmp_path):
+    """The HDF5 read path is gated on `show_attributes` too, not just the netCDF one."""
+    path = tmp_path / "with_attrs.h5"
+    with h5py.File(path, "w") as f:
+        dataset = f.create_dataset("temperature", data=np.arange(4))
+        dataset.attrs["units"] = "kelvin"
+
+    file = FileToCompare(path=path, type="hdf5")
+
+    with Outputter() as out:
+        comparison_off = Comparison(file, file, out, show_chunks=False, show_attributes=False)
+        with h5py.File(path, "r") as f:
+            props_off = comparison_off._create_var_properties(f, "temperature", original_dataset=f)
+        assert props_off.attributes == {}
+
+        comparison_on = Comparison(file, file, out, show_chunks=False, show_attributes=True)
+        with h5py.File(path, "r") as f:
+            props_on = comparison_on._create_var_properties(f, "temperature", original_dataset=f)
         assert props_on.attributes["units"] == "kelvin"
 
 
