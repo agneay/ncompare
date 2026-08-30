@@ -85,8 +85,9 @@ def _cli(args: Sequence[str] | None) -> argparse.Namespace:
         "--exit-code",
         action="store_true",
         default=False,
-        help="Return a non-zero exit code if any differences are found "
-        "(useful in scripts and CI); default behavior always exits 0 on success",
+        help="Exit 1 if any differences are found, instead of 0 "
+        "(useful in scripts and CI). A failed comparison always exits 2, "
+        "whether or not this flag is given",
     )
 
     parser.add_argument(
@@ -117,11 +118,19 @@ def main() -> None:  # pragma: no cover
     exit_on_difference = args.exit_code
     delattr(args, "exit_code")
 
+    # Exit codes follow the convention used by diff(1), cmp(1), and grep(1):
+    #   0  compared successfully; no differences
+    #   1  compared successfully; differences found (only with --exit-code)
+    #   2  could not compare
+    # Reserving 2 for failure keeps "differences found" distinguishable from
+    # "something went wrong", which matters when the exit code is what a script
+    # branches on. It also matches argparse, which already exits 2 for usage
+    # errors such as an unrecognized flag or a missing operand.
     try:
         total_diff_count = compare(**vars(args))
     except Exception:  # pylint: disable=broad-exception-caught
         print(traceback.format_exc())
-        sys.exit(1)
+        sys.exit(2)  # the comparison could not be completed
     print(total_diff_count)
     if exit_on_difference and (total_diff_count > 0):
         sys.exit(1)  # differences found, and the caller asked us to signal that

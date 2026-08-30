@@ -11,10 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Run the unit test suite on pull requests targeting `develop` and `main` (previously only PRs based on `feature/**`/`issue/**` triggered tests). Integration tests, which require Earthdata credentials, are not run on pull requests and continue to run post-merge via `version-and-build.yml` ([#355](https://github.com/nasa/ncompare/issues/355)) ([**@danielfromearth**](https://github.com/danielfromearth))
 - Internal cleanup with no change to comparison output: remove dead code, compute each variable's scale factor and attributes once instead of twice, and add missing Apache license headers ([#347](https://github.com/nasa/ncompare/issues/347)) ([**@danielfromearth**](https://github.com/danielfromearth))
 - Compare ATL06 structure from committed structure-only fixtures instead of downloading granules, so the test needs no network or Earthdata credentials and its difference count no longer changes when ATL06 is reprocessed. Tests that reach live Earthdata services no longer run automatically, so an outage there cannot break `develop`; run them on demand with `pytest -m integration` ([#361](https://github.com/nasa/ncompare/issues/361)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- A comparison that cannot be completed now exits 2 instead of 1, so `--exit-code` users can tell "differences found" (1) from "comparison failed" (2). This follows `diff`, `cmp`, and `grep`, and matches the code `argparse` already returns for an invalid invocation. Scripts testing for a non-zero exit are unaffected ([#353](https://github.com/nasa/ncompare/issues/353)) ([**@danielfromearth**](https://github.com/danielfromearth))
 
 ### Added
 
-- Add an opt-in `--exit-code` flag that returns a non-zero exit code when differences are found, for use in scripts and CI (default behavior is unchanged: exit 0 on success) ([#353](https://github.com/nasa/ncompare/issues/353)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Add an opt-in `--exit-code` flag that exits 1 when differences are found, for use in scripts and CI. Without the flag, a successful comparison still exits 0 regardless of what it finds ([#353](https://github.com/nasa/ncompare/issues/353)) ([**@danielfromearth**](https://github.com/danielfromearth))
 
 ### Fixed
 
