@@ -74,6 +74,39 @@ def test_zero_for_comparison_with_no_differences(ds_3dims_3vars_4coords_1subgrou
     assert compare(ds_3dims_3vars_4coords_1subgroup, ds_3dims_3vars_4coords_1subgroup) == 0
 
 
+def test_summary_is_not_produced_by_a_print_side_effect(tmp_path):
+    """The returned total must not depend on `_print_summary` mutating the tally."""
+    import netCDF4
+
+    from ncompare.Comparison import Comparison
+    from ncompare.printing import Outputter
+    from ncompare.utility_types import FileToCompare
+
+    # Two files whose shared variable has an attribute that differs in value
+    # (a "both"-sided difference).
+    for filename, units in (("a.nc", "m"), ("b.nc", "cm")):
+        with netCDF4.Dataset(tmp_path / filename, "w") as ds:
+            variable = ds.createVariable("x", "f4", ())
+            variable.units = units
+
+    file_a = FileToCompare(path=tmp_path / "a.nc", type="netcdf")
+    file_b = FileToCompare(path=tmp_path / "b.nc", type="netcdf")
+
+    with Outputter(keep_print_history=True) as out:
+        comparison = Comparison(file_a, file_b, out, show_chunks=False, show_attributes=True)
+        total = comparison.run_through_comparisons()
+
+        assert comparison.num_attribute_diffs["both"] >= 1  # the differing 'units' attribute
+        left_after_run = comparison.num_attribute_diffs["left"]
+
+        # Rendering the summary again must not change the tally or the total.
+        comparison._print_summary()
+        assert comparison.num_attribute_diffs["left"] == left_after_run
+        assert comparison._total_difference_count() == total
+
+    assert total >= 1
+
+
 # Number of differences between the two ATL06 granules, for the pinned version
 # (see ATL06_VERSION in conftest.py). The structural fixtures reproduce the real
 # granules' count exactly, so the hermetic test below and the opt-in test against
