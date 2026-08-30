@@ -24,6 +24,8 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 
+import pytest
+
 from ncompare.printing import Outputter
 
 
@@ -33,6 +35,12 @@ def test_list_of_strings_diff(outputter_to_console):
     )
 
     assert (left, right, shared) == (2, 3, 1)
+
+
+def test_column_widths_wrong_length_raises():
+    """Passing other than three column widths is rejected with a ValueError (not an assert)."""
+    with pytest.raises(ValueError):
+        Outputter(column_widths=(10, 20))
 
 
 def test_add_to_history_records_one_row_with_ansi_and_newlines_stripped():

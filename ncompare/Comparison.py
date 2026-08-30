@@ -60,7 +60,10 @@ class Comparison:
         show_chunks: bool,
         show_attributes: bool,
     ):
-        assert file1.type == file2.type
+        if file1.type != file2.type:
+            raise TypeError(
+                f"Both files must be of the same type; got {file1.type!r} and {file2.type!r}."
+            )
         self.file1 = file1
         self.file2 = file2
         self.file_types = file1.type
@@ -262,8 +265,8 @@ class Comparison:
         if there_is_a_difference or (not self.out.keep_only_diffs):
             self.out.side_by_side(
                 "-----VARIABLE-----:",
-                v_a.varname[:47],
-                v_b.varname[:47],
+                v_a.varname[: self.out.column_widths[1]],
+                v_b.varname[: self.out.column_widths[2]],
                 highlight_diff=False,
                 force_display_even_if_same=True,
             )
@@ -483,8 +486,10 @@ class Comparison:
             def __name_from_h5_ref(ref):
                 return original_dataset[ref].name
 
+            # Variable attributes are only read when they will be displayed;
+            # scale factor is read separately (from the variable object itself).
             v_attributes = {}
-            if self.file_types == "netcdf":
+            if self.show_attributes and self.file_types == "netcdf":
                 for name in the_variable.ncattrs():
                     try:
                         retrieved_value = the_variable.getncattr(name)
@@ -494,7 +499,7 @@ class Comparison:
                         retrieved_value = f"netCDF error: {str(key_err)}"
 
                     v_attributes[name] = retrieved_value
-            elif self.file_types == "hdf5":
+            elif self.show_attributes and self.file_types == "hdf5":
                 for name in the_variable.attrs.keys():
                     attribute_value = the_variable.attrs[name]
                     if isinstance(attribute_value, np.ndarray):

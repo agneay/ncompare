@@ -96,7 +96,8 @@ class Outputter:
         # Assign column widths according to input, if
         default_widths = [33, 48, 48]
         if column_widths is not None:
-            assert len(column_widths) == 3
+            if len(column_widths) != 3:
+                raise ValueError(f"Expected exactly 3 column widths; got {len(column_widths)}.")
 
             new_widths = default_widths
             for idx, width in enumerate(column_widths):
@@ -135,6 +136,11 @@ class Outputter:
     def __exit__(self, exc_type, exc_value, exc_traceback):  # noqa: D105
         if self._text_file_obj:
             self._text_file_obj.close()
+
+    @property
+    def column_widths(self) -> tuple:
+        """The (info, File A, File B) column widths, in characters, used when printing rows."""
+        return self._column_widths
 
     def print(
         self,
