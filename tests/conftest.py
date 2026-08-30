@@ -23,7 +23,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 
+import gzip
 import os
+import shutil
 from pathlib import Path
 
 import earthaccess
@@ -33,6 +35,36 @@ import pytest
 from xarray import Dataset
 
 from ncompare.printing import Outputter
+
+from . import data_for_tests_dir
+
+# Structure-only stand-ins for the two real ATL06 granules: same groups,
+# dimensions, variables, dtypes, chunking, and attributes, but no data values.
+# ncompare compares metadata only, so these reproduce the real comparison
+# exactly -- including its difference count -- without network access or
+# Earthdata credentials. Regenerate with
+# scripts/make_atl06_structural_fixtures.py.
+ATL06_STRUCTURE_DIR = data_for_tests_dir / "atl06_structure"
+
+
+def _unpack_fixture(gzipped_path: Path, destination_dir: Path) -> Path:
+    """Decompress a gzipped HDF5 fixture and return the resulting path."""
+    unpacked = destination_dir / gzipped_path.name.removesuffix(".gz")
+    with gzip.open(gzipped_path, "rb") as compressed, open(unpacked, "wb") as raw:
+        shutil.copyfileobj(compressed, raw)
+    return unpacked
+
+
+@pytest.fixture(scope="session")
+def atl06_structure_granule_1(temp_data_dir) -> Path:
+    """Structure-only stand-in for ATL06 granule #1. Requires no network."""
+    return _unpack_fixture(ATL06_STRUCTURE_DIR / "atl06_granule_1_structure.h5.gz", temp_data_dir)
+
+
+@pytest.fixture(scope="session")
+def atl06_structure_granule_2(temp_data_dir) -> Path:
+    """Structure-only stand-in for ATL06 granule #2. Requires no network."""
+    return _unpack_fixture(ATL06_STRUCTURE_DIR / "atl06_granule_2_structure.h5.gz", temp_data_dir)
 
 
 @pytest.fixture(scope="session")

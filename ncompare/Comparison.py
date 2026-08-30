@@ -1,3 +1,30 @@
+# Copyright 2024 United States Government as represented by the Administrator of the
+# National Aeronautics and Space Administration. All Rights Reserved.
+#
+# This software calls the following third-party software,
+# which is subject to the terms and conditions of its licensor, as applicable.
+# Users must license their own copies; the links are provided for convenience only.
+#
+# colorama - BSD-3-Clause - https://opensource.org/licenses/BSD-3-Clause
+# netCDF4 - MIT License - https://opensource.org/licenses/MIT
+# numpy - BSD-3-Clause - https://opensource.org/licenses/BSD-3-Clause
+# openpyxl - MIT License - https://opensource.org/licenses/MIT
+# xarray - Apache License, version 2.0 - https://www.apache.org/licenses/LICENSE-2.0
+# Python Standard Library - Python Software Foundation (PSF) License Agreement-
+#   https://docs.python.org/3/license.html#psf-license
+#
+# The ncompare: NetCDF structural comparison tool platform is licensed under the
+# Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and limitations under the License.
+
+"""Traverse and compare the structure of two netCDF or HDF files."""
+
 from collections.abc import Iterator
 
 import h5py
@@ -202,6 +229,13 @@ class Comparison:
         v_b: VarProperties,
     ) -> None:
         """Align and display variable properties side by side."""
+        # Compute these once and reuse them below -- both when deciding whether to
+        # highlight the variable header and when printing each attribute row.
+        variable_attribute_pairs = (
+            list(get_and_check_variable_attributes(v_a, v_b)) if self.show_attributes else []
+        )
+        scale_factor_pair = get_and_check_variable_scale_factor(v_a, v_b)
+
         # Gather all variable property pairs first, before printing,
         # so we can decide whether to highlight the variable header.
         pairs_to_check_and_show = [
@@ -211,15 +245,8 @@ class Comparison:
         ]
         if self.show_chunks:
             pairs_to_check_and_show.append((v_a.chunking, v_b.chunking))
-        if self.show_attributes:
-            for attr_a_key, attr_a, attr_b_key, attr_b in get_and_check_variable_attributes(
-                v_a, v_b
-            ):
-                # Check whether attr_a_key is empty,
-                # because it might be if the variable doesn't exist in File A.
-                pairs_to_check_and_show.append((attr_a, attr_b))
-        # Scale Factor
-        scale_factor_pair = get_and_check_variable_scale_factor(v_a, v_b)
+        for _attr_a_key, attr_a, _attr_b_key, attr_b in variable_attribute_pairs:
+            pairs_to_check_and_show.append((attr_a, attr_b))
         if scale_factor_pair:
             pairs_to_check_and_show.append((scale_factor_pair[0], scale_factor_pair[1]))
 
@@ -257,18 +284,13 @@ class Comparison:
         if self.show_chunks:
             _var_attribute_side_by_side("chunksize", v_a.chunking, v_b.chunking)
         # Scale Factor
-        scale_factor_pair = get_and_check_variable_scale_factor(v_a, v_b)
         if scale_factor_pair:
             _var_attribute_side_by_side("scale_factor", scale_factor_pair[0], scale_factor_pair[1])
         # Other attributes
-        if self.show_attributes:
-            for attr_a_key, attr_a, attr_b_key, attr_b in get_and_check_variable_attributes(
-                v_a, v_b
-            ):
-                # Check whether attr_a_key is empty,
-                # because it might be if the variable doesn't exist in File A.
-                attribute_key = attr_a_key if attr_a_key else attr_b_key
-                _var_attribute_side_by_side(attribute_key, attr_a, attr_b)
+        for attr_a_key, attr_a, attr_b_key, attr_b in variable_attribute_pairs:
+            # attr_a_key may be empty if the variable doesn't exist in File A.
+            attribute_key = attr_a_key if attr_a_key else attr_b_key
+            _var_attribute_side_by_side(attribute_key, attr_a, attr_b)
 
     def _print_root_dimensions(self):
         # Show the dimensions of each file and evaluate differences.

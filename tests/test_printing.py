@@ -24,9 +24,20 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 
+from ncompare.printing import Outputter
+
+
 def test_list_of_strings_diff(outputter_to_console):
     left, right, shared = outputter_to_console.lists_diff(
         ["hey", "yo", "beebop"], ["what", "is", "this", "beebop"]
     )
 
     assert (left, right, shared) == (2, 3, 1)
+
+
+def test_add_to_history_records_one_row_with_ansi_and_newlines_stripped():
+    """A single call records one row; ANSI codes/newlines are stripped and non-strings coerced."""
+    out = Outputter(keep_print_history=True)
+    out._add_to_history("\x1b[31mred\x1b[0m", "plain\n", 42)
+
+    assert out._line_history == [["red", "plain", "42"]]
