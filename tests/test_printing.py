@@ -41,3 +41,11 @@ def test_column_widths_wrong_length_raises():
     """Passing other than three column widths is rejected with a ValueError (not an assert)."""
     with pytest.raises(ValueError):
         Outputter(column_widths=(10, 20))
+
+
+def test_add_to_history_records_one_row_with_ansi_and_newlines_stripped():
+    """A single call records one row; ANSI codes/newlines are stripped and non-strings coerced."""
+    out = Outputter(keep_print_history=True)
+    out._add_to_history("\x1b[31mred\x1b[0m", "plain\n", 42)
+
+    assert out._line_history == [["red", "plain", "42"]]
