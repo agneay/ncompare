@@ -27,6 +27,22 @@
 
 from importlib.metadata import version
 
+# `netCDF4` must be imported before `h5py`. Both distribute wheels that bundle
+# their own copy of the HDF5 library, and only the first one loaded is used. When
+# `h5py` wins that race, `netCDF4` can no longer open valid netCDF4 files on
+# Linux, failing with "[Errno -101] NetCDF: HDF error". See
+# https://github.com/Unidata/netcdf4-python/issues/653 and
+# https://github.com/Unidata/netcdf4-python/issues/1343; importing `netCDF4`
+# first is the accepted workaround.
+#
+# Importing it here fixes the order for every entry point, because Python runs
+# this module before any `ncompare` submodule. It cannot be fixed by reordering
+# the imports inside those submodules: `h5py` sorts before `netCDF4`
+# alphabetically, so the linter would just put it back.
+#
+# tests/test_import_order.py guards this.
+import netCDF4  # noqa: F401  # imported first for its side effect on load order
+
 from .core import (
     compare,
 )
