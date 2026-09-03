@@ -59,6 +59,13 @@ ansi_escape = re.compile(
     re.VERBOSE,
 )
 
+# Pristine copies of colorama's process-wide color singletons, taken at import time
+# and therefore before any Outputter can blank them. An Outputter that asks for color
+# restores from these, so a no-color Outputter that was never used as a context
+# manager cannot leave the process permanently colorless.
+_pristine_fore = dict(Fore.__dict__)
+_pristine_style = dict(Style.__dict__)
+
 
 class Outputter:
     """Handler for print statements and saving to text and/or csv files."""
@@ -116,11 +123,13 @@ class Outputter:
 
         # When color is turned off, colorama's process-wide `Fore`/`Style`
         # singletons are blanked so that (a) no ANSI codes are emitted and
-        # (b) column alignment is computed on codeless strings. Because those
-        # singletons are global, the original values are saved here and restored
-        # in `__exit__`, keeping the mutation scoped to this Outputter's lifetime
-        # rather than leaking across `compare()` calls or to other libraries.
-        self._no_color = no_color
+        # (b) column alignment is computed on codeless strings — `side_by_side`
+        # pads the leading gutter by `len(Fore.RED)` to compensate for escape
+        # sequences, and blanking makes that compensation zero. Because those
+        # singletons are global, the mutation is bounded from both ends: the
+        # previous values are saved here and restored in `__exit__`, and asking
+        # for color restores the pristine values, which repairs the state even
+        # if some earlier Outputter was never used as a context manager.
         self._saved_fore: dict | None = None
         self._saved_style: dict | None = None
         if no_color:
@@ -132,6 +141,8 @@ class Outputter:
             for k in list(Style.__dict__):
                 Style.__dict__[k] = ""
         else:
+            Fore.__dict__.update(_pristine_fore)
+            Style.__dict__.update(_pristine_style)
             colorama.init(autoreset=True)
 
         # Open a file (this overwrites any existing file at this path).

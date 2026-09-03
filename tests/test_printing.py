@@ -71,3 +71,20 @@ def test_no_color_state_is_restored_after_context_exit():
     # ...and restored on exit, so subsequent output can be colorized again.
     assert Fore.RED == original_red
     assert Style.RESET_ALL == original_reset
+
+
+def test_no_color_leak_is_repaired_by_a_later_colorized_outputter():
+    """A no-color Outputter used without `with` cannot leave colorama colorless for good.
+
+    `__exit__` is the usual restore point, but nothing obliges a caller to use the
+    context manager, so a colorized Outputter also repairs the global state when it
+    is constructed.
+    """
+    original_red = Fore.RED
+    assert original_red != ""  # sanity check: colors are present to begin with
+
+    Outputter(no_color=True)  # deliberately not a context manager: `__exit__` never runs
+    assert Fore.RED == ""
+
+    Outputter()  # asking for color repairs whatever the previous Outputter left behind
+    assert Fore.RED == original_red
