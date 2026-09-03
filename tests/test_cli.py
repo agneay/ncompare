@@ -24,11 +24,16 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 import os
+import re
 import subprocess
+
+import pytest
 
 from ncompare.console import _cli
 
 from . import data_for_tests_dir
+
+ansi_escape_sequence = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
 def test_console_version():
@@ -105,3 +110,66 @@ def test_failure_diagnostics_go_to_stderr():
     assert result.returncode == 2
     assert "Traceback" in result.stderr
     assert "Traceback" not in result.stdout
+
+
+def _stdout_under_a_terminal(command: list[str]) -> str:
+    """Run a command with stdout attached to a pseudo-terminal, returning what it wrote.
+
+    A pseudo-terminal is needed to observe color at all: colorama strips escape
+    sequences when stdout is not a terminal, so a plain pipe makes colorized and
+    no-color runs indistinguishable.
+    """
+    import pty
+
+    controller, worker = pty.openpty()
+    process = subprocess.Popen(command, stdout=worker, stderr=subprocess.DEVNULL)
+    os.close(worker)  # so that reading the controller ends once the child exits
+
+    chunks = []
+    while True:
+        try:
+            data = os.read(controller, 65536)
+        except OSError:  # Linux raises EIO at end-of-stream; macOS returns b""
+            break
+        if not data:
+            break
+        chunks.append(data)
+
+    os.close(controller)
+    process.wait(timeout=60)
+
+    return b"".join(chunks).decode("utf-8", errors="replace")
+
+
+@pytest.mark.skipif(not hasattr(os, "openpty"), reason="pseudo-terminals are POSIX-only")
+def test_no_color_flag_suppresses_ansi_escape_sequences():
+    """`--no-color` emits no escape sequences, whereas a default run does."""
+    file_a = str(data_for_tests_dir / "test_a.nc")
+    file_b = str(data_for_tests_dir / "test_b.nc")
+
+    colorized = _stdout_under_a_terminal(["ncompare", file_a, file_b])
+    uncolorized = _stdout_under_a_terminal(["ncompare", file_a, file_b, "--no-color"])
+
+    assert ansi_escape_sequence.search(colorized)
+    assert not ansi_escape_sequence.search(uncolorized)
+
+
+def test_no_color_report_is_aligned_the_same_as_the_colorized_one():
+    """Turning color off must not shift the columns.
+
+    `side_by_side` pads the leading gutter by `len(Fore.RED)` to pay for the escape
+    sequence it prefixes onto the first column, and blanking the color constants makes
+    that padding zero. Both halves of that arithmetic have to move together, so the two
+    reports are identical once the escape sequences are removed.
+    """
+    file_a = str(data_for_tests_dir / "test_a.nc")
+    file_b = str(data_for_tests_dir / "test_b.nc")
+
+    colorized = subprocess.run(
+        ["ncompare", file_a, file_b], capture_output=True, text=True, check=False
+    ).stdout
+    uncolorized = subprocess.run(
+        ["ncompare", file_a, file_b, "--no-color"], capture_output=True, text=True, check=False
+    ).stdout
+
+    assert ansi_escape_sequence.sub("", colorized) == uncolorized
