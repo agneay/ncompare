@@ -29,7 +29,7 @@
 import csv
 import re
 import warnings
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from pathlib import Path
 from typing import TextIO
 
@@ -96,7 +96,8 @@ class Outputter:
         # Assign column widths according to input, if
         default_widths = [33, 48, 48]
         if column_widths is not None:
-            assert len(column_widths) == 3
+            if len(column_widths) != 3:
+                raise ValueError(f"Expected exactly 3 column widths; got {len(column_widths)}.")
 
             new_widths = default_widths
             for idx, width in enumerate(column_widths):
@@ -133,12 +134,9 @@ class Outputter:
         else:
             colorama.init(autoreset=True)
 
-        # Open a file
+        # Open a file (this overwrites any existing file at this path).
         if text_file:
             filepath = Path(text_file)
-            if filepath.exists():
-                pass
-            # This will overwrite any existing file at this path if one exists.
             self._text_file_obj: TextIO | None = open(filepath, "w", encoding="utf-8")  # pylint: disable=consider-using-with
         else:
             self._text_file_obj = None
@@ -155,6 +153,11 @@ class Outputter:
             Fore.__dict__.update(self._saved_fore)
         if self._saved_style is not None:
             Style.__dict__.update(self._saved_style)
+
+    @property
+    def column_widths(self) -> tuple:
+        """The (info, File A, File B) column widths, in characters, used when printing rows."""
+        return self._column_widths
 
     def print(
         self,
@@ -202,24 +205,20 @@ class Outputter:
             # Remove any leading or trailing newlines.
             return result.strip("\n")
 
-        if isinstance(args, str):
-            parsed_strings = [_parse_single_str(args)]
-        elif isinstance(args, Iterable):
-            parsed_strings = []
-            for item in args:
-                if not isinstance(item, str):
-                    try:
-                        string = str(item)
-                    except Exception as err:
-                        raise TypeError(
-                            f"Error <{err}> with {str(item)}! Expected a string; got a <{type(item)}>."
-                        ) from err
-                else:
-                    string = item
+        # `args` is always a tuple (this method takes *args), so we iterate it directly.
+        parsed_strings = []
+        for item in args:
+            if not isinstance(item, str):
+                try:
+                    string = str(item)
+                except Exception as err:
+                    raise TypeError(
+                        f"Error <{err}> with {str(item)}! Expected a string; got a <{type(item)}>."
+                    ) from err
+            else:
+                string = item
 
-                parsed_strings.append(_parse_single_str(string))
-        else:
-            raise TypeError(f"Invalid type <{type(args)}>. Expected a `str` or `list`.")
+            parsed_strings.append(_parse_single_str(string))
 
         if self._keep_print_history:
             self._line_history.append(parsed_strings)

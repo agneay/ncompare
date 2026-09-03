@@ -75,6 +75,39 @@ a common use of _ncompare_ may look like this example:
 ncompare S001G01.nc S001G01_SUBSET.nc --file-text subset_comparison.txt
 ```
 
+To make _ncompare_ signal differences through its exit code (for example, to
+fail a CI job), add the `--exit-code` flag:
+
+```console
+ncompare S001G01.nc S001G01_SUBSET.nc --exit-code
+```
+
+#### Exit codes
+
+Following the convention used by `diff`, `cmp`, and `grep`:
+
+| Code | Meaning |
+|------|---------|
+| `0`  | Compared successfully; no differences found |
+| `1`  | Compared successfully; differences found — only with `--exit-code`, which otherwise exits `0` |
+| `2`  | The comparison could not be completed (for example, a file is missing or unreadable, or an argument is invalid) |
+
+The comparison report and its difference count are written to standard output;
+diagnostics from a failed run go to standard error. So standard output stays
+parseable whether or not the run succeeds.
+
+Because a failed comparison is reported as `2` rather than `1`, a script can
+distinguish "the files differ" from "ncompare could not compare them":
+
+```console
+ncompare S001G01.nc S001G01_SUBSET.nc --exit-code
+case $? in
+  0) echo "identical" ;;
+  1) echo "files differ" ;;
+  *) echo "comparison failed" ;;
+esac
+```
+
 ### In a Python kernel:
 
 ```python
