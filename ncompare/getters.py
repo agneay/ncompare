@@ -3,6 +3,7 @@ from collections.abc import Iterable, Iterator
 
 import h5py
 import netCDF4
+import numpy as np
 import xarray as xr
 
 from ncompare.sequence_operations import common_elements
@@ -67,17 +68,37 @@ def get_root_groups(file: FileToCompare) -> list:
     return groups_list
 
 
+def _attribute_as_str(value: object) -> str:
+    """Normalize an attribute value to a plain string for comparison.
+
+    ``h5py`` returns HDF5 fixed-length string attributes as ``bytes`` (e.g. ``b'NASA'``),
+    whereas the equivalent netCDF attribute is a ``str`` (``'NASA'``). Decoding byte
+    strings here keeps the two formats comparable and avoids both a spurious difference
+    and an ugly ``b'...'`` in the report.
+    """
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, np.ndarray) and value.dtype.kind in ("S", "O"):
+        return str(
+            [
+                item.decode("utf-8", errors="replace") if isinstance(item, bytes) else str(item)
+                for item in value.tolist()
+            ]
+        )
+    return str(value)
+
+
 def get_root_attributes(file: FileToCompare) -> dict:
     """Get a dict of global (root-level) attributes from a netCDF or HDF5 file."""
     attributes: dict = {}
     if file.type == "netcdf":
         with netCDF4.Dataset(file.path) as dataset:
             for name in dataset.ncattrs():
-                attributes[name] = str(dataset.getncattr(name))
+                attributes[name] = _attribute_as_str(dataset.getncattr(name))
     elif file.type == "hdf5":
         with h5py.File(file.path) as dataset:
             for name in dataset.attrs.keys():
-                attributes[name] = str(dataset.attrs[name])
+                attributes[name] = _attribute_as_str(dataset.attrs[name])
     return attributes
 
 

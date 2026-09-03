@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Include global (root-level) attributes in the comparison report when `--show-attributes` is set ([#77](https://github.com/nasa/ncompare/issues/77))
 
+### Fixed
+- Decode HDF5 fixed-length string attributes so they compare equal to the equivalent netCDF string attribute instead of showing as a false difference ([#77](https://github.com/nasa/ncompare/issues/77))
+- Prevent doubled line endings (`\r\r\n`) in CSV output written on Windows ([#77](https://github.com/nasa/ncompare/issues/77))
+
 ## [1.14.0] - 2025-12-30
 
 _Updates base Python version from 3.9 to 3.11._
