@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restore colorama's global color state after a no-color comparison, so `no_color=True` no longer permanently disables color for later comparisons or other libraries in the same process ([#345](https://github.com/nasa/ncompare/issues/345)) ([**@danielfromearth**](https://github.com/danielfromearth))
 - Read HDF5 root-level dimensions via h5py dimension scales and degrade gracefully when they can't be introspected, so `ncompare` no longer crashes on non-netCDF4 HDF5 files ([#357](https://github.com/nasa/ncompare/issues/357)) ([**@danielfromearth**](https://github.com/danielfromearth))
 - Pin the ATL06 granule version in the integration test so its difference count is reproducible; NASA reprocessed ATL06 (006 → 007), which had changed the count and broken CI ([#359](https://github.com/nasa/ncompare/issues/359)) ([**@danielfromearth**](https://github.com/danielfromearth))
-- Decode HDF5 fixed-length string attributes so they compare equal to the equivalent netCDF string attribute instead of showing as a false difference ([#77](https://github.com/nasa/ncompare/issues/77)) ([**@agneay**](https://github.com/agneay))
+- Decode HDF5 fixed-length strings in global (root-level) attributes so they compare equal to the equivalent netCDF string attribute instead of showing as a false difference ([#77](https://github.com/nasa/ncompare/issues/77)) ([**@agneay**](https://github.com/agneay))
 - Prevent doubled line endings (`\r\r\n`) in CSV output written on Windows ([#344](https://github.com/nasa/ncompare/pull/344)) ([**@agneay**](https://github.com/agneay))
 
 ## [1.14.0] - 2025-12-30
