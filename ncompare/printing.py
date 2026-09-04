@@ -29,7 +29,7 @@
 import csv
 import re
 import warnings
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from pathlib import Path
 from typing import TextIO
 
@@ -58,6 +58,13 @@ ansi_escape = re.compile(
 """,
     re.VERBOSE,
 )
+
+# Pristine copies of colorama's process-wide color singletons, taken at import time
+# and therefore before any Outputter can blank them. An Outputter that asks for color
+# restores from these, so a no-color Outputter that was never used as a context
+# manager cannot leave the process permanently colorless.
+_pristine_fore = dict(Fore.__dict__)
+_pristine_style = dict(Style.__dict__)
 
 
 class Outputter:
@@ -96,7 +103,8 @@ class Outputter:
         # Assign column widths according to input, if
         default_widths = [33, 48, 48]
         if column_widths is not None:
-            assert len(column_widths) == 3
+            if len(column_widths) != 3:
+                raise ValueError(f"Expected exactly 3 column widths; got {len(column_widths)}.")
 
             new_widths = default_widths
             for idx, width in enumerate(column_widths):
@@ -113,21 +121,33 @@ class Outputter:
         else:
             self._column_widths = tuple(default_widths)
 
+        # When color is turned off, colorama's process-wide `Fore`/`Style`
+        # singletons are blanked so that (a) no ANSI codes are emitted and
+        # (b) column alignment is computed on codeless strings — `side_by_side`
+        # pads the leading gutter by `len(Fore.RED)` to compensate for escape
+        # sequences, and blanking makes that compensation zero. Because those
+        # singletons are global, the mutation is bounded from both ends: the
+        # previous values are saved here and restored in `__exit__`, and asking
+        # for color restores the pristine values, which repairs the state even
+        # if some earlier Outputter was never used as a context manager.
+        self._saved_fore: dict | None = None
+        self._saved_style: dict | None = None
         if no_color:
             # Replace colorized styles with blank strings.
-            for k, _ in Fore.__dict__.items():
+            self._saved_fore = dict(Fore.__dict__)
+            self._saved_style = dict(Style.__dict__)
+            for k in list(Fore.__dict__):
                 Fore.__dict__[k] = ""
-            for k, _ in Style.__dict__.items():
+            for k in list(Style.__dict__):
                 Style.__dict__[k] = ""
         else:
+            Fore.__dict__.update(_pristine_fore)
+            Style.__dict__.update(_pristine_style)
             colorama.init(autoreset=True)
 
-        # Open a file
+        # Open a file (this overwrites any existing file at this path).
         if text_file:
             filepath = Path(text_file)
-            if filepath.exists():
-                pass
-            # This will overwrite any existing file at this path if one exists.
             self._text_file_obj: TextIO | None = open(filepath, "w", encoding="utf-8")  # pylint: disable=consider-using-with
         else:
             self._text_file_obj = None
@@ -138,6 +158,17 @@ class Outputter:
     def __exit__(self, exc_type, exc_value, exc_traceback):  # noqa: D105
         if self._text_file_obj:
             self._text_file_obj.close()
+        # Restore the global colorama state that was blanked for no-color output,
+        # so color settings don't leak to later Outputters or other libraries.
+        if self._saved_fore is not None:
+            Fore.__dict__.update(self._saved_fore)
+        if self._saved_style is not None:
+            Style.__dict__.update(self._saved_style)
+
+    @property
+    def column_widths(self) -> tuple:
+        """The (info, File A, File B) column widths, in characters, used when printing rows."""
+        return self._column_widths
 
     def print(
         self,
@@ -185,24 +216,20 @@ class Outputter:
             # Remove any leading or trailing newlines.
             return result.strip("\n")
 
-        if isinstance(args, str):
-            parsed_strings = [_parse_single_str(args)]
-        elif isinstance(args, Iterable):
-            parsed_strings = []
-            for item in args:
-                if not isinstance(item, str):
-                    try:
-                        string = str(item)
-                    except Exception as err:
-                        raise TypeError(
-                            f"Error <{err}> with {str(item)}! Expected a string; got a <{type(item)}>."
-                        ) from err
-                else:
-                    string = item
+        # `args` is always a tuple (this method takes *args), so we iterate it directly.
+        parsed_strings = []
+        for item in args:
+            if not isinstance(item, str):
+                try:
+                    string = str(item)
+                except Exception as err:
+                    raise TypeError(
+                        f"Error <{err}> with {str(item)}! Expected a string; got a <{type(item)}>."
+                    ) from err
+            else:
+                string = item
 
-                parsed_strings.append(_parse_single_str(string))
-        else:
-            raise TypeError(f"Invalid type <{type(args)}>. Expected a `str` or `list`.")
+            parsed_strings.append(_parse_single_str(string))
 
         if self._keep_print_history:
             self._line_history.append(parsed_strings)

@@ -23,7 +23,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 
+import gzip
 import os
+import shutil
 from pathlib import Path
 
 import earthaccess
@@ -33,6 +35,36 @@ import pytest
 from xarray import Dataset
 
 from ncompare.printing import Outputter
+
+from . import data_for_tests_dir
+
+# Structure-only stand-ins for the two real ATL06 granules: same groups,
+# dimensions, variables, dtypes, chunking, and attributes, but no data values.
+# ncompare compares metadata only, so these reproduce the real comparison
+# exactly -- including its difference count -- without network access or
+# Earthdata credentials. Regenerate with
+# scripts/make_atl06_structural_fixtures.py.
+ATL06_STRUCTURE_DIR = data_for_tests_dir / "atl06_structure"
+
+
+def _unpack_fixture(gzipped_path: Path, destination_dir: Path) -> Path:
+    """Decompress a gzipped HDF5 fixture and return the resulting path."""
+    unpacked = destination_dir / gzipped_path.name.removesuffix(".gz")
+    with gzip.open(gzipped_path, "rb") as compressed, open(unpacked, "wb") as raw:
+        shutil.copyfileobj(compressed, raw)
+    return unpacked
+
+
+@pytest.fixture(scope="session")
+def atl06_structure_granule_1(temp_data_dir) -> Path:
+    """Structure-only stand-in for ATL06 granule #1. Requires no network."""
+    return _unpack_fixture(ATL06_STRUCTURE_DIR / "atl06_granule_1_structure.h5.gz", temp_data_dir)
+
+
+@pytest.fixture(scope="session")
+def atl06_structure_granule_2(temp_data_dir) -> Path:
+    """Structure-only stand-in for ATL06 granule #2. Requires no network."""
+    return _unpack_fixture(ATL06_STRUCTURE_DIR / "atl06_granule_2_structure.h5.gz", temp_data_dir)
 
 
 @pytest.fixture(scope="session")
@@ -62,20 +94,29 @@ def earthdata_auth():
     return True
 
 
+# Pin the ATL06 version so the comparison -- and its difference count -- is
+# reproducible. ATL06 is periodically reprocessed (e.g., 006 -> 007), which changes
+# the data and would otherwise change the expected count in test_icesat.
+ATL06_VERSION = "007"
+
+
 @pytest.fixture(scope="session")
 def icesat2_atl06_granule_1(icesat2_cache_dir, earthdata_auth):
     """
     Download or use cached ICESat-2 ATL06 granule #1 for comparison tests.
     Temporal range: 2023-08-16 16:16:15 to 2023-08-16 16:25:00
     """
-    # Check if already cached
-    cached_files = list(icesat2_cache_dir.glob("ATL06_20230816161508_*.h5"))
+    # Check if already cached (version-specific, so a stale version isn't reused)
+    cached_files = list(icesat2_cache_dir.glob(f"ATL06_20230816161508_*_{ATL06_VERSION}_*.h5"))
     if cached_files:
         return str(cached_files[0])
 
     # Download if not cached
     results = earthaccess.search_data(
-        short_name="ATL06", temporal=("2023-08-16 16:16:15", "2023-08-16 16:25:00"), count=1
+        short_name="ATL06",
+        version=ATL06_VERSION,
+        temporal=("2023-08-16 16:16:15", "2023-08-16 16:25:00"),
+        count=1,
     )
 
     if not results:
@@ -96,14 +137,17 @@ def icesat2_atl06_granule_2(icesat2_cache_dir, earthdata_auth):
     Download or use cached ICESat-2 ATL06 granule #2 for comparison tests.
     Temporal range: 2023-08-16 23:46:00 to 2023-08-16 23:48:00
     """
-    # Check if already cached
-    cached_files = list(icesat2_cache_dir.glob("ATL06_20230816234629_*.h5"))
+    # Check if already cached (version-specific, so a stale version isn't reused)
+    cached_files = list(icesat2_cache_dir.glob(f"ATL06_20230816234629_*_{ATL06_VERSION}_*.h5"))
     if cached_files:
         return str(cached_files[0])
 
     # Download if not cached
     results = earthaccess.search_data(
-        short_name="ATL06", temporal=("2023-08-16 23:46:00", "2023-08-16 23:48:00"), count=1
+        short_name="ATL06",
+        version=ATL06_VERSION,
+        temporal=("2023-08-16 23:46:00", "2023-08-16 23:48:00"),
+        count=1,
     )
 
     if not results:

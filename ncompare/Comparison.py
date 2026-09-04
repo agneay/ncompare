@@ -1,3 +1,30 @@
+# Copyright 2024 United States Government as represented by the Administrator of the
+# National Aeronautics and Space Administration. All Rights Reserved.
+#
+# This software calls the following third-party software,
+# which is subject to the terms and conditions of its licensor, as applicable.
+# Users must license their own copies; the links are provided for convenience only.
+#
+# colorama - BSD-3-Clause - https://opensource.org/licenses/BSD-3-Clause
+# netCDF4 - MIT License - https://opensource.org/licenses/MIT
+# numpy - BSD-3-Clause - https://opensource.org/licenses/BSD-3-Clause
+# openpyxl - MIT License - https://opensource.org/licenses/MIT
+# xarray - Apache License, version 2.0 - https://www.apache.org/licenses/LICENSE-2.0
+# Python Standard Library - Python Software Foundation (PSF) License Agreement-
+#   https://docs.python.org/3/license.html#psf-license
+#
+# The ncompare: NetCDF structural comparison tool platform is licensed under the
+# Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and limitations under the License.
+
+"""Traverse and compare the structure of two netCDF or HDF files."""
+
 from collections.abc import Iterator
 
 import h5py
@@ -34,7 +61,10 @@ class Comparison:
         show_chunks: bool,
         show_attributes: bool,
     ):
-        assert file1.type == file2.type
+        if file1.type != file2.type:
+            raise TypeError(
+                f"Both files must be of the same type; got {file1.type!r} and {file2.type!r}."
+            )
         self.file1 = file1
         self.file2 = file2
         self.file_types = file1.type
@@ -77,14 +107,18 @@ class Comparison:
         self._print_summary()
 
         # Return the total number of differences; zero indicates no differences were found.
-        total_diff_count = sum(
-            [
-                x["left"] + x["right"]
-                for x in [self.num_var_diffs, self.num_group_diffs, self.num_attribute_diffs]
-            ]
-        )
+        return self._total_difference_count()
 
-        return total_diff_count
+    def _total_difference_count(self) -> int:
+        """Total number of differences across variables, groups, and attributes.
+
+        A "both" difference (an item present on both sides but differing in value) is
+        counted on each side, matching the non-shared counts shown in the summary.
+        """
+        return sum(
+            counts["left"] + counts["right"] + 2 * counts["both"]
+            for counts in (self.num_var_diffs, self.num_group_diffs, self.num_attribute_diffs)
+        )
 
     def _traverse_hierarchy(self):
         self.out.side_by_side(
@@ -183,13 +217,15 @@ class Comparison:
 
         # Go through each variable in the current group.
         for variable_pair in common_elements(vars_a_sorted, vars_b_sorted):
-            # Get and print the properties of each variable
+            # Get and print the properties of each variable.
+            # Note: each variable's object-reference attributes must be resolved
+            # against its *own* file, so File B uses open_file2 (not open_file1).
             self._print_var_properties_side_by_side(
                 self._create_var_properties(
                     group_a, variable_pair[1], original_dataset=self.open_file1
                 ),
                 self._create_var_properties(
-                    group_b, variable_pair[2], original_dataset=self.open_file1
+                    group_b, variable_pair[2], original_dataset=self.open_file2
                 ),
             )
 
@@ -199,6 +235,13 @@ class Comparison:
         v_b: VarProperties,
     ) -> None:
         """Align and display variable properties side by side."""
+        # Compute these once and reuse them below -- both when deciding whether to
+        # highlight the variable header and when printing each attribute row.
+        variable_attribute_pairs = (
+            list(get_and_check_variable_attributes(v_a, v_b)) if self.show_attributes else []
+        )
+        scale_factor_pair = get_and_check_variable_scale_factor(v_a, v_b)
+
         # Gather all variable property pairs first, before printing,
         # so we can decide whether to highlight the variable header.
         pairs_to_check_and_show = [
@@ -208,15 +251,8 @@ class Comparison:
         ]
         if self.show_chunks:
             pairs_to_check_and_show.append((v_a.chunking, v_b.chunking))
-        if self.show_attributes:
-            for attr_a_key, attr_a, attr_b_key, attr_b in get_and_check_variable_attributes(
-                v_a, v_b
-            ):
-                # Check whether attr_a_key is empty,
-                # because it might be if the variable doesn't exist in File A.
-                pairs_to_check_and_show.append((attr_a, attr_b))
-        # Scale Factor
-        scale_factor_pair = get_and_check_variable_scale_factor(v_a, v_b)
+        for _attr_a_key, attr_a, _attr_b_key, attr_b in variable_attribute_pairs:
+            pairs_to_check_and_show.append((attr_a, attr_b))
         if scale_factor_pair:
             pairs_to_check_and_show.append((scale_factor_pair[0], scale_factor_pair[1]))
 
@@ -232,40 +268,54 @@ class Comparison:
         if there_is_a_difference or (not self.out.keep_only_diffs):
             self.out.side_by_side(
                 "-----VARIABLE-----:",
-                v_a.varname[:47],
-                v_b.varname[:47],
+                v_a.varname[: self.out.column_widths[1]],
+                v_b.varname[: self.out.column_widths[2]],
                 highlight_diff=False,
                 force_display_even_if_same=True,
             )
 
         # Go through each attribute, show differences, and add differences to running tally.
-        def _var_attribute_side_by_side(attribute_name, attribute_a, attribute_b):
-            diff_condition: SummaryDifferenceKeys = self.out.side_by_side(
-                f"{attribute_name}:", attribute_a, attribute_b, highlight_diff=True
-            )
-            self.num_attribute_diffs[diff_condition] += 1
-            if diff_condition in ("left", "right", "both"):
-                self.num_attribute_diffs["difference_types"].add(attribute_name)
-
-        _var_attribute_side_by_side("dtype", v_a.dtype, v_b.dtype)
-        _var_attribute_side_by_side("dimensions", v_a.dimensions, v_b.dimensions)
-        _var_attribute_side_by_side("shape", v_a.shape, v_b.shape)
+        self._tally_attribute_difference("dtype", v_a.dtype, v_b.dtype)
+        self._tally_attribute_difference("dimensions", v_a.dimensions, v_b.dimensions)
+        self._tally_attribute_difference("shape", v_a.shape, v_b.shape)
         # Chunking
         if self.show_chunks:
-            _var_attribute_side_by_side("chunksize", v_a.chunking, v_b.chunking)
+            self._tally_attribute_difference("chunksize", v_a.chunking, v_b.chunking)
         # Scale Factor
-        scale_factor_pair = get_and_check_variable_scale_factor(v_a, v_b)
         if scale_factor_pair:
-            _var_attribute_side_by_side("scale_factor", scale_factor_pair[0], scale_factor_pair[1])
+            self._tally_attribute_difference(
+                "scale_factor", scale_factor_pair[0], scale_factor_pair[1]
+            )
         # Other attributes
-        if self.show_attributes:
-            for attr_a_key, attr_a, attr_b_key, attr_b in get_and_check_variable_attributes(
-                v_a, v_b
-            ):
-                # Check whether attr_a_key is empty,
-                # because it might be if the variable doesn't exist in File A.
-                attribute_key = attr_a_key if attr_a_key else attr_b_key
-                _var_attribute_side_by_side(attribute_key, attr_a, attr_b)
+        for attr_a_key, attr_a, attr_b_key, attr_b in variable_attribute_pairs:
+            # attr_a_key may be empty if the variable doesn't exist in File A.
+            attribute_key = attr_a_key if attr_a_key else attr_b_key
+            self._tally_attribute_difference(attribute_key, attr_a, attr_b)
+
+    def _tally_attribute_difference(
+        self, attribute_name: str, attribute_a: str, attribute_b: str
+    ) -> None:
+        """Print one attribute row side by side and fold it into the attribute tally.
+
+        Parameters
+        ----------
+        attribute_name
+            label shown in the info column (a trailing colon is added)
+        attribute_a
+            the attribute's value in File A, already stringified
+        attribute_b
+            the attribute's value in File B, already stringified
+
+        Returns
+        -------
+        None
+        """
+        diff_condition: SummaryDifferenceKeys = self.out.side_by_side(
+            f"{attribute_name}:", attribute_a, attribute_b, highlight_diff=True
+        )
+        self.num_attribute_diffs[diff_condition] += 1
+        if diff_condition in ("left", "right", "both"):
+            self.num_attribute_diffs["difference_types"].add(attribute_name)
 
     def _print_root_dimensions(self):
         # Show the dimensions of each file and evaluate differences.
@@ -281,25 +331,29 @@ class Comparison:
         list_b = get_root_groups(self.file2)
         _, _, _ = self.out.lists_diff(list_a, list_b)
 
-    def _print_root_attributes(self):
-        # Show the global (root-level) attributes of each file and evaluate differences.
+    def _print_root_attributes(self) -> None:
+        """Print both files' global (root-level) attributes, side by side.
+
+        Only called when ``show_attributes`` is set. Differences feed the same
+        attribute tally as variable-level attributes, so they show up in the
+        summary counts and in the returned difference total.
+
+        Returns
+        -------
+        None
+        """
         self.out.print(Fore.LIGHTBLUE_EX + "\nRoot-level Attributes:", add_to_history=True)
         attrs_a = get_root_attributes(self.file1)
         attrs_b = get_root_attributes(self.file2)
 
         for _, attr_a_key, attr_b_key in common_elements(attrs_a.keys(), attrs_b.keys()):
-            # Check whether attr_a_key is empty,
-            # because it might be if the attribute doesn't exist in File A.
+            # attr_a_key is empty when the attribute exists only in File B.
             attribute_key = attr_a_key if attr_a_key else attr_b_key
-            diff_condition: SummaryDifferenceKeys = self.out.side_by_side(
-                f"{attribute_key}:",
+            self._tally_attribute_difference(
+                attribute_key,
                 attrs_a.get(attr_a_key, ""),
                 attrs_b.get(attr_b_key, ""),
-                highlight_diff=True,
             )
-            self.num_attribute_diffs[diff_condition] += 1
-            if diff_condition in ("left", "right", "both"):
-                self.num_attribute_diffs["difference_types"].add(attribute_key)
 
     def _print_summary(self):
         """Print summary counts of similarities and differences."""
@@ -325,9 +379,10 @@ class Comparison:
         item_type: str,
         diff_dictionary: SummaryDifferencesDict,
     ) -> None:
-        # Tally up instances where there were non-empty entries on both left and right sides.
-        diff_dictionary["left"] += diff_dictionary["both"]
-        diff_dictionary["right"] += diff_dictionary["both"]
+        # A "both" difference (present on both sides but differing) counts on each side.
+        # Compute the display values locally, without mutating the tally dictionary.
+        non_shared_left = diff_dictionary["left"] + diff_dictionary["both"]
+        non_shared_right = diff_dictionary["right"] + diff_dictionary["both"]
 
         self.out.side_by_side(
             f"Total # of shared {item_type}s:",
@@ -338,8 +393,8 @@ class Comparison:
 
         self.out.side_by_side(
             f"Total # of non-shared {item_type}s:",
-            str(diff_dictionary["left"]),
-            str(diff_dictionary["right"]),
+            str(non_shared_left),
+            str(non_shared_right),
             force_display_even_if_same=True,
         )
 
@@ -405,7 +460,7 @@ class Comparison:
             )
             subnode_a_subgroups = get_subgroups(subnode_a, file_type=self.file_types)
 
-            subnode_b_name = node_a_name + "/" + subgroup_b_name if subgroup_b_name else ""
+            subnode_b_name = node_b_name + "/" + subgroup_b_name if subgroup_b_name else ""
             subnode_b = (
                 node_b[subgroup_b_name]
                 if (subgroup_b_name and (subgroup_b_name in node_b_subgroups))
@@ -453,7 +508,13 @@ class Comparison:
                 v_dimensions = str(the_variable.dimensions)
             elif self.file_types == "hdf5":
                 dim_list: list[str] = []
-                for dim in the_variable.dims:
+                # Accessing `.dims` can raise on HDF5 files whose dimension scales
+                # can't be introspected; treat those as having no dimensions.
+                try:
+                    variable_dims = list(the_variable.dims)
+                except RuntimeError:
+                    variable_dims = []
+                for dim in variable_dims:
                     try:
                         dim_list.append(dim.label)
                     except RuntimeError:
@@ -471,8 +532,10 @@ class Comparison:
             def __name_from_h5_ref(ref):
                 return original_dataset[ref].name
 
+            # Variable attributes are only read when they will be displayed;
+            # scale factor is read separately (from the variable object itself).
             v_attributes = {}
-            if self.file_types == "netcdf":
+            if self.show_attributes and self.file_types == "netcdf":
                 for name in the_variable.ncattrs():
                     try:
                         retrieved_value = the_variable.getncattr(name)
@@ -482,7 +545,7 @@ class Comparison:
                         retrieved_value = f"netCDF error: {str(key_err)}"
 
                     v_attributes[name] = retrieved_value
-            elif self.file_types == "hdf5":
+            elif self.show_attributes and self.file_types == "hdf5":
                 for name in the_variable.attrs.keys():
                     attribute_value = the_variable.attrs[name]
                     if isinstance(attribute_value, np.ndarray):

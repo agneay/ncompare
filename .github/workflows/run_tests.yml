@@ -10,12 +10,6 @@ on:
     secrets:
       codecov_token:
         required: true
-      EARTHDATA_USERNAME:
-        description: 'NASA Earthdata username'
-        required: true
-      EARTHDATA_PASSWORD:
-        description: 'NASA Earthdata password'
-        required: true
   workflow_dispatch:
 
 jobs:
@@ -28,13 +22,13 @@ jobs:
     name: Python ${{ matrix.python-version }} tests
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Override .python-version for matrix testing
         run: echo "${{ matrix.python-version }}" > .python-version
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -49,24 +43,22 @@ jobs:
       - name: Run linting
         run: uv run ruff check ncompare
 
-      - name: Run unit tests with coverage
+      - name: Run tests with coverage
+        # Tests marked `integration` reach live NASA Earthdata and are excluded
+        # here. Nothing they cover is left untested: the ATL06 comparison runs
+        # as an ordinary test against committed structure-only fixtures. They
+        # exist for a developer to run deliberately (`pytest -m integration`)
+        # to confirm the real granules still match those fixtures.
         run: |
           uv run pytest -v -m "not integration" --cov=ncompare --cov-report=
 
-      - name: Run integration tests with coverage
-        env:
-          EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}
-          EARTHDATA_PASSWORD: ${{ secrets.EARTHDATA_PASSWORD }}
-        run: |
-          uv run pytest -v -m integration --cov=ncompare --cov-append --cov-report=
-
-      - name: Generate combined coverage report
+      - name: Generate coverage report
         run: |
           uv run coverage xml -o build/reports/coverage${{ matrix.python-version }}.xml
           uv run coverage report
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: build/reports/coverage${{ matrix.python-version }}.xml

@@ -6,12 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Run the unit test suite on pull requests targeting `develop` and `main` (previously only PRs based on `feature/**`/`issue/**` triggered tests). Integration tests, which require Earthdata credentials, are not run on pull requests and continue to run post-merge via `version-and-build.yml` ([#355](https://github.com/nasa/ncompare/issues/355)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Internal cleanup with no change to comparison output: remove dead code, compute each variable's scale factor and attributes once instead of twice, and add missing Apache license headers ([#347](https://github.com/nasa/ncompare/issues/347)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Compare ATL06 structure from committed structure-only fixtures instead of downloading granules, so the test needs no network or Earthdata credentials and its difference count no longer changes when ATL06 is reprocessed. Tests that reach live Earthdata services no longer run automatically, so an outage there cannot break `develop`; run them on demand with `pytest -m integration` ([#361](https://github.com/nasa/ncompare/issues/361)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- A comparison that cannot be completed now exits 2 instead of 1, so `--exit-code` users can tell "differences found" (1) from "comparison failed" (2). This follows `diff`, `cmp`, and `grep`, and matches the code `argparse` already returns for an invalid invocation. Scripts testing for a non-zero exit are unaffected ([#353](https://github.com/nasa/ncompare/issues/353)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Print the traceback from a failed comparison to standard error instead of standard output, so that standard output carries only the comparison report and its difference count ([#353](https://github.com/nasa/ncompare/issues/353)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Compute the returned difference total explicitly instead of via a side effect in the summary-printing code, so the total no longer depends on rendering having run first (printed output and returned total are unchanged) ([#351](https://github.com/nasa/ncompare/issues/351)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Validate inputs with exceptions instead of `assert`, which is stripped under `python -O`: comparing two files of different types now raises `TypeError`, and supplying other than three `--column-widths` values raises `ValueError`. Read each variable's attributes only when `--show-attributes` requests them; a variable's scale factor is read from the variable itself, so it is still reported either way. Truncate variable names to the configured `--column-widths` rather than a hardcoded 47 characters, so a narrowed column no longer prints names wider than itself; at the default width of 48, names of 48 or more characters now show one character more than before ([#349](https://github.com/nasa/ncompare/issues/349)) ([**@danielfromearth**](https://github.com/danielfromearth))
+
 ### Added
-- Include global (root-level) attributes in the comparison report when `--show-attributes` is set ([#77](https://github.com/nasa/ncompare/issues/77))
+
+- Add an opt-in `--exit-code` flag that exits 1 when differences are found, for use in scripts and CI. Without the flag, a successful comparison still exits 0 regardless of what it finds ([#353](https://github.com/nasa/ncompare/issues/353)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Include global (root-level) attributes in the comparison report when `--show-attributes` is set ([#77](https://github.com/nasa/ncompare/issues/77)) ([**@agneay**](https://github.com/agneay))
 
 ### Fixed
-- Decode HDF5 fixed-length string attributes so they compare equal to the equivalent netCDF string attribute instead of showing as a false difference ([#77](https://github.com/nasa/ncompare/issues/77))
-- Prevent doubled line endings (`\r\r\n`) in CSV output written on Windows ([#77](https://github.com/nasa/ncompare/issues/77))
+
+- Fix the command line failing on netCDF files on Linux with "[Errno -101] NetCDF: HDF error". `h5py` and `netCDF4` each bundle their own copy of the HDF5 library and only the first loaded is used, so `netCDF4` is now imported first ([#363](https://github.com/nasa/ncompare/issues/363)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Resolve each variable's HDF5 object-reference attributes against its own file (File B was incorrectly dereferenced against File A), and use the correct parent-group name when building nested group paths during traversal ([#341](https://github.com/nasa/ncompare/issues/341)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Restore colorama's global color state after a no-color comparison, so `no_color=True` no longer permanently disables color for later comparisons or other libraries in the same process ([#345](https://github.com/nasa/ncompare/issues/345)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Read HDF5 root-level dimensions via h5py dimension scales and degrade gracefully when they can't be introspected, so `ncompare` no longer crashes on non-netCDF4 HDF5 files ([#357](https://github.com/nasa/ncompare/issues/357)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Pin the ATL06 granule version in the integration test so its difference count is reproducible; NASA reprocessed ATL06 (006 → 007), which had changed the count and broken CI ([#359](https://github.com/nasa/ncompare/issues/359)) ([**@danielfromearth**](https://github.com/danielfromearth))
+- Decode HDF5 fixed-length string attributes so they compare equal to the equivalent netCDF string attribute instead of showing as a false difference ([#77](https://github.com/nasa/ncompare/issues/77)) ([**@agneay**](https://github.com/agneay))
+- Prevent doubled line endings (`\r\r\n`) in CSV output written on Windows ([#344](https://github.com/nasa/ncompare/pull/344)) ([**@agneay**](https://github.com/agneay))
 
 ## [1.14.0] - 2025-12-30
 

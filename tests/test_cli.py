@@ -24,8 +24,16 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 import os
+import re
+import subprocess
+
+import pytest
 
 from ncompare.console import _cli
+
+from . import data_for_tests_dir
+
+ansi_escape_sequence = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
 def test_console_version():
@@ -46,3 +54,122 @@ def test_arg_parser():
     assert getattr(parsed, "show_attributes") is False
     assert getattr(parsed, "show_chunks") is False
     assert getattr(parsed, "only_diffs") is False
+    assert getattr(parsed, "exit_code") is False
+
+
+def test_arg_parser_exit_code_flag():
+    assert _cli(["first_netcdf.nc", "second_netcdf.nc"]).exit_code is False
+    assert _cli(["first_netcdf.nc", "second_netcdf.nc", "--exit-code"]).exit_code is True
+
+
+def _exit_status(command: str) -> int:
+    """Return the exit code of a shell command, decoded from os.system().
+
+    Output is discarded: these tests assert on the exit code, and the failure
+    cases would otherwise print full tracebacks into the test log.
+    """
+    # os.system encodes the status the way wait(2) does, so exit code 1 arrives
+    # as 256. os.waitstatus_to_exitcode turns that back into 1.
+    return os.waitstatus_to_exitcode(os.system(f"{command} > /dev/null 2>&1"))
+
+
+def test_exit_code_reflects_differences():
+    file_a = data_for_tests_dir / "test_a.nc"
+    file_b = data_for_tests_dir / "test_b.nc"
+
+    # Default behavior: always exit 0 on a successful run, even when files differ.
+    assert _exit_status(f'ncompare "{file_a}" "{file_b}"') == 0
+
+    # With --exit-code: 1 when differences are found, 0 when there are none.
+    assert _exit_status(f'ncompare "{file_a}" "{file_b}" --exit-code') == 1
+    assert _exit_status(f'ncompare "{file_a}" "{file_a}" --exit-code') == 0
+
+
+def test_exit_code_2_when_comparison_fails():
+    """A failed comparison is 2, so it stays distinguishable from 'files differ'."""
+    missing = data_for_tests_dir / "does_not_exist.nc"
+    real = data_for_tests_dir / "test_a.nc"
+
+    # Independent of --exit-code: failure is always 2, never 1.
+    assert _exit_status(f'ncompare "{missing}" "{real}"') == 2
+    assert _exit_status(f'ncompare "{missing}" "{real}" --exit-code') == 2
+
+    # argparse reports an invalid invocation with the same code.
+    assert _exit_status("ncompare --not-a-real-flag") == 2
+
+
+def test_failure_diagnostics_go_to_stderr():
+    """Keep stdout parseable: the traceback belongs on stderr, not mixed into the report."""
+    missing = data_for_tests_dir / "does_not_exist.nc"
+    real = data_for_tests_dir / "test_a.nc"
+
+    result = subprocess.run(
+        ["ncompare", str(missing), str(real)], capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 2
+    assert "Traceback" in result.stderr
+    assert "Traceback" not in result.stdout
+
+
+def _stdout_under_a_terminal(command: list[str]) -> str:
+    """Run a command with stdout attached to a pseudo-terminal, returning what it wrote.
+
+    A pseudo-terminal is needed to observe color at all: colorama strips escape
+    sequences when stdout is not a terminal, so a plain pipe makes colorized and
+    no-color runs indistinguishable.
+    """
+    import pty
+
+    controller, worker = pty.openpty()
+    process = subprocess.Popen(command, stdout=worker, stderr=subprocess.DEVNULL)
+    os.close(worker)  # so that reading the controller ends once the child exits
+
+    chunks = []
+    while True:
+        try:
+            data = os.read(controller, 65536)
+        except OSError:  # Linux raises EIO at end-of-stream; macOS returns b""
+            break
+        if not data:
+            break
+        chunks.append(data)
+
+    os.close(controller)
+    process.wait(timeout=60)
+
+    return b"".join(chunks).decode("utf-8", errors="replace")
+
+
+@pytest.mark.skipif(not hasattr(os, "openpty"), reason="pseudo-terminals are POSIX-only")
+def test_no_color_flag_suppresses_ansi_escape_sequences():
+    """`--no-color` emits no escape sequences, whereas a default run does."""
+    file_a = str(data_for_tests_dir / "test_a.nc")
+    file_b = str(data_for_tests_dir / "test_b.nc")
+
+    colorized = _stdout_under_a_terminal(["ncompare", file_a, file_b])
+    uncolorized = _stdout_under_a_terminal(["ncompare", file_a, file_b, "--no-color"])
+
+    assert ansi_escape_sequence.search(colorized)
+    assert not ansi_escape_sequence.search(uncolorized)
+
+
+def test_no_color_report_is_aligned_the_same_as_the_colorized_one():
+    """Turning color off must not shift the columns.
+
+    `side_by_side` pads the leading gutter by `len(Fore.RED)` to pay for the escape
+    sequence it prefixes onto the first column, and blanking the color constants makes
+    that padding zero. Both halves of that arithmetic have to move together, so the two
+    reports are identical once the escape sequences are removed.
+    """
+    file_a = str(data_for_tests_dir / "test_a.nc")
+    file_b = str(data_for_tests_dir / "test_b.nc")
+
+    colorized = subprocess.run(
+        ["ncompare", file_a, file_b], capture_output=True, text=True, check=False
+    ).stdout
+    uncolorized = subprocess.run(
+        ["ncompare", file_a, file_b, "--no-color"], capture_output=True, text=True, check=False
+    ).stdout
+
+    assert ansi_escape_sequence.sub("", colorized) == uncolorized
