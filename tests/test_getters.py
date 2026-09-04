@@ -76,6 +76,36 @@ def test_get_root_attributes_hdf5_fixed_length_string_matches_netcdf(tmp_path):
     assert nc_attrs == h5_attrs
 
 
+def test_get_root_attributes_hdf5_array_of_fixed_length_strings(tmp_path):
+    """An HDF5 attribute holding multiple fixed-length strings decodes every element.
+
+    Unlike a scalar string attribute, this value arrives from h5py as a
+    ``numpy.ndarray`` of ``bytes`` (dtype kind ``"S"``), which takes a separate
+    branch in ``_value_to_comparable_str`` from the scalar-``bytes`` case covered
+    by ``test_get_root_attributes_hdf5_fixed_length_string_matches_netcdf`` above.
+    """
+    filepath = tmp_path / "multi_string_attr.h5"
+    with h5py.File(filepath, mode="w") as ds:
+        ds.attrs.create("sources", np.array([b"NASA", b"JPL", b"GSFC"]))
+
+    result = get_root_attributes(FileToCompare(filepath, type="hdf5"))
+
+    assert result["sources"] == "[NASA, JPL, GSFC, ...]"
+
+
+def test_get_root_attributes_degrades_gracefully_on_unreadable_file(tmp_path):
+    """A file that can't be opened yields an empty dict instead of raising.
+
+    Mirrors ``get_root_dims``'s degrade-gracefully behavior (see
+    ``test_get_root_dims_pure_hdf5_without_dimension_scales``), so a file that
+    can't be introspected doesn't abort the whole comparison.
+    """
+    filepath = tmp_path / "not_actually_netcdf.nc"
+    filepath.write_bytes(b"not a real netcdf file")
+
+    assert get_root_attributes(FileToCompare(filepath, type="netcdf")) == {}
+
+
 # def test_var_properties(ds_3dims_3vars_4coords_1group):
 #     with nc.Dataset(ds_3dims_3vars_4coords_1group) as ds:
 #         result = get_var_properties(ds.groups["Group1"], varname="step", file_type="netcdf")
